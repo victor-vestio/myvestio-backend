@@ -1,6 +1,7 @@
 import { getResendClient } from '../config/resend';
 import { EmailOptions, EmailTemplate } from '../utils/types';
 import { IUser } from '../interfaces/IUser';
+import { KYCStatus } from '../interfaces/common';
 
 export class EmailService {
   private static fromEmail = process.env.FROM_EMAIL || 'noreply@myvestio.net';
@@ -101,6 +102,17 @@ export class EmailService {
 
   static async sendLoginAlert(user: IUser, loginDetails: { ip: string; userAgent: string; timestamp: Date }): Promise<boolean> {
     const template = this.getLoginAlertTemplate(user, loginDetails);
+    
+    return await this.sendEmail({
+      to: user.email,
+      subject: template.subject,
+      html: template.htmlContent,
+      text: template.textContent
+    });
+  }
+
+  static async sendKYCStatusUpdate(user: IUser, status: KYCStatus, notes?: string): Promise<boolean> {
+    const template = this.getKYCStatusUpdateTemplate(user, status, notes);
     
     return await this.sendEmail({
       to: user.email,
@@ -477,6 +489,130 @@ export class EmailService {
 
     return {
       subject: 'New Login Alert - Vestio',
+      htmlContent,
+      textContent
+    };
+  }
+
+  private static getKYCStatusUpdateTemplate(user: IUser, status: KYCStatus, notes?: string): EmailTemplate {
+    let statusColor = '#3498db';
+    let statusTitle = 'KYC Status Update';
+    let statusMessage = '';
+    let actionRequired = '';
+
+    switch (status) {
+      case KYCStatus.SUBMITTED:
+        statusColor = '#f39c12';
+        statusTitle = 'KYC Documents Submitted';
+        statusMessage = 'Thank you for submitting your KYC documents. Our team will review them and get back to you within 3-5 business days.';
+        actionRequired = 'No further action is required at this time. We will notify you once the review is complete.';
+        break;
+
+      case KYCStatus.UNDER_REVIEW:
+        statusColor = '#f39c12';
+        statusTitle = 'KYC Under Review';
+        statusMessage = 'Your KYC documents are currently being reviewed by our compliance team.';
+        actionRequired = 'Please wait for the review to complete. We will contact you if we need any additional information.';
+        break;
+
+      case KYCStatus.APPROVED:
+        statusColor = '#27ae60';
+        statusTitle = 'KYC Approved - Welcome to Vestio!';
+        statusMessage = 'Congratulations! Your KYC documents have been approved. You now have full access to all Vestio features.';
+        actionRequired = 'You can now start using all platform features including creating and managing invoices, accessing financing options, and more.';
+        break;
+
+      case KYCStatus.REJECTED:
+        statusColor = '#e74c3c';
+        statusTitle = 'KYC Documents Require Attention';
+        statusMessage = 'After reviewing your submitted documents, we need you to address some issues before we can approve your KYC.';
+        actionRequired = 'Please review the feedback below, update your documents accordingly, and resubmit for review.';
+        break;
+
+      default:
+        statusMessage = 'Your KYC status has been updated.';
+        actionRequired = 'Please log in to your account to view the current status.';
+    }
+
+    const loginLink = `${this.frontendUrl}/login`;
+    const kycLink = `${this.frontendUrl}/dashboard/kyc`;
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>${statusTitle} - Vestio</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h1 style="color: ${statusColor};">${statusTitle}</h1>
+          
+          <p>Hello ${user.firstName},</p>
+          
+          <p>${statusMessage}</p>
+          
+          <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0; border-left: 4px solid ${statusColor};">
+            <h3>Status: ${status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ')}</h3>
+            <p><strong>Next Steps:</strong> ${actionRequired}</p>
+            
+            ${notes ? `
+              <div style="margin-top: 15px; padding: 15px; background-color: #fff; border-radius: 3px; border: 1px solid #ddd;">
+                <h4 style="margin: 0 0 10px 0;">Additional Notes:</h4>
+                <p style="margin: 0;">${notes}</p>
+              </div>
+            ` : ''}
+          </div>
+          
+          ${status === KYCStatus.APPROVED ? `
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${kycLink}" style="background-color: ${statusColor}; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">Access Your Dashboard</a>
+            </div>
+          ` : status === KYCStatus.REJECTED ? `
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${kycLink}" style="background-color: ${statusColor}; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">Update KYC Documents</a>
+            </div>
+          ` : `
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${loginLink}" style="background-color: ${statusColor}; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">View Account Status</a>
+            </div>
+          `}
+          
+          <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin-top: 30px;">
+            <h4>Need Help?</h4>
+            <p style="margin: 5px 0;">If you have any questions about the KYC process or need assistance, please don't hesitate to contact our support team.</p>
+          </div>
+          
+          <p style="margin-top: 30px;">Best regards,<br>The Vestio Compliance Team</p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const textContent = `
+      ${statusTitle}
+      
+      Hello ${user.firstName},
+      
+      ${statusMessage}
+      
+      Status: ${status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ')}
+      Next Steps: ${actionRequired}
+      
+      ${notes ? `Additional Notes: ${notes}\n` : ''}
+      
+      ${status === KYCStatus.APPROVED ? `Access your dashboard: ${kycLink}` : 
+        status === KYCStatus.REJECTED ? `Update your documents: ${kycLink}` : 
+        `View account status: ${loginLink}`}
+      
+      If you need help, please contact our support team.
+      
+      Best regards,
+      The Vestio Compliance Team
+    `;
+
+    return {
+      subject: `${statusTitle} - Vestio`,
       htmlContent,
       textContent
     };

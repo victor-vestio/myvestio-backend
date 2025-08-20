@@ -1,5 +1,7 @@
-import express from 'express';
 import dotenv from 'dotenv';
+dotenv.config();
+
+import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
@@ -7,8 +9,7 @@ import { connectMongoDB, connectRedis } from './config/database';
 import { configureCloudinary } from './config/cloudinary';
 import { configureResend } from './config/resend';
 import authRoutes from './routes/auth';
-
-dotenv.config();
+import { kycRouter } from './routes/kyc';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -30,6 +31,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/kyc', kycRouter);
 
 app.get('/', (req, res) => {
   res.json({ 
@@ -85,6 +87,7 @@ const startServer = async (): Promise<void> => {
       console.log(`🚀 Server is running on port ${port}`);
       console.log(`📊 Health check available at http://localhost:${port}/health`);
       console.log(`🔐 Auth endpoints available at http://localhost:${port}/api/auth`);
+      console.log(`📄 KYC endpoints available at http://localhost:${port}/api/kyc`);
       console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
     });
   } catch (error) {

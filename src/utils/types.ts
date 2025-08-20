@@ -1,8 +1,10 @@
 import { Request } from 'express';
 import { IUser } from '../interfaces/IUser';
+import { UploadedFile } from '../middleware/upload';
 
 export interface AuthenticatedRequest extends Request {
   user?: IUser;
+  uploadedFiles?: UploadedFile[];
 }
 
 export interface JWTTokens {
