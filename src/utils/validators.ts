@@ -64,28 +64,59 @@ export const registerSchema = Joi.object({
     }),
   
   businessType: Joi.string()
-    .valid(...Object.values(BusinessType))
-    .when('role', {
-      is: UserRole.LENDER,
-      then: Joi.required(),
-      otherwise: Joi.optional()
-    })
-    .messages({
-      'any.only': 'Business type must be either individual or company',
-      'any.required': 'Business type is required for lenders'
-    }),
+    .when('role', [
+      {
+        is: UserRole.LENDER,
+        then: Joi.required().valid(...Object.values(BusinessType)).messages({
+          'any.required': 'Business type is required for lenders',
+          'any.only': 'Lenders must choose either individual or company'
+        })
+      },
+      {
+        is: UserRole.SELLER, 
+        then: Joi.required().valid(BusinessType.COMPANY).messages({
+          'any.required': 'Business type is required for sellers',
+          'any.only': 'Sellers must be registered as companies'
+        })
+      },
+      {
+        is: UserRole.ANCHOR,
+        then: Joi.required().valid(BusinessType.COMPANY).messages({
+          'any.required': 'Business type is required for anchors', 
+          'any.only': 'Anchors must be registered as companies'
+        })
+      }
+    ]),
   
   businessName: Joi.string()
     .trim()
     .max(100)
-    .when('businessType', {
-      is: BusinessType.COMPANY,
-      then: Joi.required(),
-      otherwise: Joi.optional()
-    })
+    .when('role', [
+      {
+        is: UserRole.SELLER,
+        then: Joi.required().messages({
+          'any.required': 'Business name is required for sellers'
+        })
+      },
+      {
+        is: UserRole.ANCHOR, 
+        then: Joi.required().messages({
+          'any.required': 'Business name is required for anchors'
+        })
+      },
+      {
+        is: UserRole.LENDER,
+        then: Joi.when('businessType', {
+          is: BusinessType.COMPANY,
+          then: Joi.required().messages({
+            'any.required': 'Business name is required for company lenders'
+          }),
+          otherwise: Joi.optional()
+        })
+      }
+    ])
     .messages({
-      'string.max': 'Business name cannot exceed 100 characters',
-      'any.required': 'Business name is required for companies'
+      'string.max': 'Business name cannot exceed 100 characters'
     })
 });
 
