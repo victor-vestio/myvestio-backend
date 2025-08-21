@@ -38,3 +38,32 @@ export interface TokenPayload {
   iat?: number;
   exp?: number;
 }
+
+export enum KYCStatus {
+  NOT_SUBMITTED = 'not_submitted',
+  SUBMITTED = 'submitted',
+  UNDER_REVIEW = 'under_review',
+  APPROVED = 'approved',
+  REJECTED = 'rejected',
+  INCOMPLETE = 'incomplete'
+}
+
+export enum DocumentType {
+  // Common Documents
+  GOVERNMENT_ID = 'government_id',
+  PROOF_OF_ADDRESS = 'proof_of_address',
+  
+  // Business Documents
+  CAC = 'cac',
+  TIN = 'tin',
+  TAX_CLEARANCE = 'tax_clearance',
+  SIGNATORY_LIST = 'signatory_list',
+  BOARD_RESOLUTION = 'board_resolution',
+  
+  // Financial Documents
+  AUDITED_FINANCIALS = 'audited_financials',
+  BANK_STATEMENTS = 'bank_statements',
+  
+  // Additional
+  DATE_OF_BIRTH_CERTIFICATE = 'date_of_birth_certificate'
+}

@@ -1,5 +1,5 @@
 import Joi from 'joi';
-import { UserRole, BusinessType } from '../interfaces/common';
+import { UserRole, BusinessType, DocumentType } from '../interfaces/common';
 
 // Auth validation schemas
 export const registerSchema = Joi.object({
@@ -293,5 +293,155 @@ export const verifyTwoFASchema = Joi.object({
       'string.length': '2FA code must be 6 digits',
       'string.pattern.base': '2FA code must contain only numbers',
       'any.required': '2FA code is required'
+    })
+});
+
+// KYC validation schemas
+export const submitKYCSchema = Joi.object({
+  documentTypes: Joi.array()
+    .items(Joi.string().valid(...Object.values(DocumentType)))
+    .min(1)
+    .required()
+    .messages({
+      'array.min': 'At least one document is required',
+      'any.required': 'Document types are required',
+      'any.only': 'Invalid document type'
+    }),
+  
+  bankDetails: Joi.object({
+    accountNumber: Joi.string()
+      .trim()
+      .min(10)
+      .max(20)
+      .pattern(/^[0-9]+$/)
+      .required()
+      .messages({
+        'string.min': 'Account number must be at least 10 digits',
+        'string.max': 'Account number cannot exceed 20 digits',
+        'string.pattern.base': 'Account number must contain only numbers',
+        'any.required': 'Account number is required'
+      }),
+    
+    bankName: Joi.string()
+      .trim()
+      .min(2)
+      .max(100)
+      .required()
+      .messages({
+        'string.min': 'Bank name must be at least 2 characters',
+        'string.max': 'Bank name cannot exceed 100 characters',
+        'any.required': 'Bank name is required'
+      }),
+    
+    accountName: Joi.string()
+      .trim()
+      .min(2)
+      .max(100)
+      .required()
+      .messages({
+        'string.min': 'Account name must be at least 2 characters',
+        'string.max': 'Account name cannot exceed 100 characters',
+        'any.required': 'Account name is required'
+      }),
+    
+    bvn: Joi.string()
+      .trim()
+      .length(11)
+      .pattern(/^[0-9]+$/)
+      .optional()
+      .messages({
+        'string.length': 'BVN must be exactly 11 digits',
+        'string.pattern.base': 'BVN must contain only numbers'
+      })
+  }).optional(),
+  
+  dateOfBirth: Joi.string()
+    .isoDate()
+    .optional()
+    .messages({
+      'string.isoDate': 'Date of birth must be a valid date'
+    })
+});
+
+export const updateKYCSchema = Joi.object({
+  documentTypes: Joi.array()
+    .items(Joi.string().valid(...Object.values(DocumentType)))
+    .optional(),
+  
+  bankDetails: Joi.object({
+    accountNumber: Joi.string()
+      .trim()
+      .min(10)
+      .max(20)
+      .pattern(/^[0-9]+$/)
+      .required()
+      .messages({
+        'string.min': 'Account number must be at least 10 digits',
+        'string.max': 'Account number cannot exceed 20 digits',
+        'string.pattern.base': 'Account number must contain only numbers',
+        'any.required': 'Account number is required'
+      }),
+    
+    bankName: Joi.string()
+      .trim()
+      .min(2)
+      .max(100)
+      .required()
+      .messages({
+        'string.min': 'Bank name must be at least 2 characters',
+        'string.max': 'Bank name cannot exceed 100 characters',
+        'any.required': 'Bank name is required'
+      }),
+    
+    accountName: Joi.string()
+      .trim()
+      .min(2)
+      .max(100)
+      .required()
+      .messages({
+        'string.min': 'Account name must be at least 2 characters',
+        'string.max': 'Account name cannot exceed 100 characters',
+        'any.required': 'Account name is required'
+      }),
+    
+    bvn: Joi.string()
+      .trim()
+      .length(11)
+      .pattern(/^[0-9]+$/)
+      .optional()
+      .messages({
+        'string.length': 'BVN must be exactly 11 digits',
+        'string.pattern.base': 'BVN must contain only numbers'
+      })
+  }).optional(),
+  
+  dateOfBirth: Joi.string()
+    .isoDate()
+    .optional()
+    .messages({
+      'string.isoDate': 'Date of birth must be a valid date'
+    })
+});
+
+export const approveKYCSchema = Joi.object({
+  approvalNotes: Joi.string()
+    .trim()
+    .max(500)
+    .optional()
+    .messages({
+      'string.max': 'Approval notes cannot exceed 500 characters'
+    })
+});
+
+export const rejectKYCSchema = Joi.object({
+  rejectionReason: Joi.string()
+    .trim()
+    .min(10)
+    .max(500)
+    .required()
+    .messages({
+      'string.min': 'Rejection reason must be at least 10 characters',
+      'string.max': 'Rejection reason cannot exceed 500 characters',
+      'any.required': 'Rejection reason is required'
     })
 });
