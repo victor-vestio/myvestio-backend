@@ -42,6 +42,56 @@ export const uploadKYCDocuments = (req: Request, res: Response, next: NextFuncti
   });
 };
 
+// Middleware for handling invoice document uploads
+export const uploadInvoiceDocuments = {
+  single: (fieldName: string) => (req: Request, res: Response, next: NextFunction) => {
+    upload.single(fieldName)(req, res, (error) => {
+      if (error) {
+        if (error.code === 'LIMIT_FILE_SIZE') {
+          return res.status(400).json({
+            success: false,
+            message: 'Invoice document upload failed',
+            error: 'File size exceeds 5MB limit'
+          });
+        }
+        return res.status(400).json({
+          success: false,
+          message: 'Invoice document upload failed',
+          error: error.message
+        });
+      }
+      next();
+    });
+  },
+  
+  array: (fieldName: string, maxCount: number = 5) => (req: Request, res: Response, next: NextFunction) => {
+    upload.array(fieldName, maxCount)(req, res, (error) => {
+      if (error) {
+        if (error.code === 'LIMIT_FILE_SIZE') {
+          return res.status(400).json({
+            success: false,
+            message: 'Supporting documents upload failed',
+            error: 'File size exceeds 5MB limit'
+          });
+        }
+        if (error.code === 'LIMIT_FILE_COUNT') {
+          return res.status(400).json({
+            success: false,
+            message: 'Supporting documents upload failed',
+            error: `Too many files. Maximum ${maxCount} files allowed`
+          });
+        }
+        return res.status(400).json({
+          success: false,
+          message: 'Supporting documents upload failed',
+          error: error.message
+        });
+      }
+      next();
+    });
+  }
+};
+
 // Upload files to Cloudinary
 export const uploadToCloudinary = async (
   file: Express.Multer.File,
@@ -59,7 +109,10 @@ export const uploadToCloudinary = async (
           folder,
           public_id: filename.split('.')[0], // Remove extension for public_id
           resource_type: 'auto',
-          format: file.originalname.split('.').pop() // Preserve original format
+          type: 'authenticated', // Secure access for KYC documents
+          format: file.originalname.split('.').pop(), // Preserve original format
+          backup: true, // Enable backup for compliance
+          tags: ['kyc', 'document', userId, documentType]
         },
         (error, result) => {
           if (error) reject(error);

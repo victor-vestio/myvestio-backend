@@ -67,3 +67,15 @@ export enum DocumentType {
   // Additional
   DATE_OF_BIRTH_CERTIFICATE = 'date_of_birth_certificate'
 }
+
+export enum InvoiceStatus {
+  DRAFT = 'draft',
+  SUBMITTED = 'submitted',
+  ANCHOR_APPROVED = 'anchor_approved',
+  ADMIN_VERIFIED = 'admin_verified',
+  LISTED = 'listed',
+  FUNDED = 'funded',
+  REPAID = 'repaid',
+  SETTLED = 'settled',
+  REJECTED = 'rejected'
+}

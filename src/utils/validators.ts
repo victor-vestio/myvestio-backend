@@ -445,3 +445,270 @@ export const rejectKYCSchema = Joi.object({
       'any.required': 'Rejection reason is required'
     })
 });
+
+// ============================================
+// INVOICE VALIDATION SCHEMAS
+// ============================================
+
+export const createInvoiceSchema = Joi.object({
+  anchorId: Joi.string()
+    .required()
+    .pattern(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/)
+    .messages({
+      'string.pattern.base': 'Invalid anchor ID format - must be a valid UUID'
+    }),
+  
+  amount: Joi.number()
+    .positive()
+    .precision(2)
+    .max(10000000)
+    .required()
+    .messages({
+      'number.positive': 'Amount must be positive',
+      'number.max': 'Amount cannot exceed 10,000,000'
+    }),
+  
+  currency: Joi.string()
+    .valid('NGN', 'USD', 'EUR', 'GBP')
+    .default('NGN')
+    .messages({
+      'any.only': 'Currency must be one of NGN, USD, EUR, GBP'
+    }),
+  
+  issueDate: Joi.date()
+    .max('now')
+    .required()
+    .messages({
+      'date.max': 'Issue date cannot be in the future'
+    }),
+  
+  dueDate: Joi.date()
+    .greater(Joi.ref('issueDate'))
+    .required()
+    .messages({
+      'date.greater': 'Due date must be after issue date'
+    }),
+  
+  description: Joi.string()
+    .min(10)
+    .max(1000)
+    .required()
+    .messages({
+      'string.min': 'Description must be at least 10 characters',
+      'string.max': 'Description cannot exceed 1000 characters'
+    })
+});
+
+export const updateInvoiceSchema = Joi.object({
+  anchorId: Joi.string()
+    .pattern(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/)
+    .messages({
+      'string.pattern.base': 'Invalid anchor ID format - must be a valid UUID'
+    }),
+  
+  amount: Joi.number()
+    .positive()
+    .precision(2)
+    .max(10000000)
+    .messages({
+      'number.positive': 'Amount must be positive',
+      'number.max': 'Amount cannot exceed 10,000,000'
+    }),
+  
+  currency: Joi.string()
+    .valid('NGN', 'USD', 'EUR', 'GBP')
+    .messages({
+      'any.only': 'Currency must be one of NGN, USD, EUR, GBP'
+    }),
+  
+  issueDate: Joi.date()
+    .max('now')
+    .messages({
+      'date.max': 'Issue date cannot be in the future'
+    }),
+  
+  dueDate: Joi.date()
+    .when('issueDate', {
+      is: Joi.exist(),
+      then: Joi.date().greater(Joi.ref('issueDate')),
+      otherwise: Joi.date()
+    })
+    .messages({
+      'date.greater': 'Due date must be after issue date'
+    }),
+  
+  description: Joi.string()
+    .min(10)
+    .max(1000)
+    .messages({
+      'string.min': 'Description must be at least 10 characters',
+      'string.max': 'Description cannot exceed 1000 characters'
+    })
+}).min(1).messages({
+  'object.min': 'At least one field must be provided for update'
+});
+
+export const submitInvoiceSchema = Joi.object({
+  finalNotes: Joi.string()
+    .max(500)
+    .allow('')
+    .messages({
+      'string.max': 'Final notes cannot exceed 500 characters'
+    })
+});
+
+export const anchorApprovalSchema = Joi.object({
+  action: Joi.string()
+    .valid('approve', 'reject')
+    .required()
+    .messages({
+      'any.only': 'Action must be either approve or reject'
+    }),
+  
+  notes: Joi.string()
+    .max(1000)
+    .allow('')
+    .when('action', {
+      is: 'reject',
+      then: Joi.string().min(10).required(),
+      otherwise: Joi.string()
+    })
+    .messages({
+      'string.min': 'Rejection reason must be at least 10 characters',
+      'string.max': 'Notes cannot exceed 1000 characters'
+    }),
+  
+  fundingTerms: Joi.object({
+    maxFundingAmount: Joi.number()
+      .positive()
+      .precision(2)
+      .when('...action', {
+        is: 'approve',
+        then: Joi.required(),
+        otherwise: Joi.forbidden()
+      })
+      .messages({
+        'number.positive': 'Funding amount must be positive'
+      }),
+    
+    recommendedInterestRate: Joi.number()
+      .min(0)
+      .max(5)
+      .precision(2)
+      .when('...action', {
+        is: 'approve',
+        then: Joi.required(),
+        otherwise: Joi.forbidden()
+      })
+      .messages({
+        'number.min': 'Interest rate must be non-negative',
+        'number.max': 'Interest rate cannot exceed 5% (company policy)'
+      })
+  }).when('action', {
+    is: 'approve',
+    then: Joi.required(),
+    otherwise: Joi.forbidden()
+  })
+});
+
+export const adminVerificationSchema = Joi.object({
+  action: Joi.string()
+    .valid('verify', 'reject')
+    .required()
+    .messages({
+      'any.only': 'Action must be either verify or reject'
+    }),
+  
+  notes: Joi.string()
+    .max(1000)
+    .allow('')
+    .when('action', {
+      is: 'reject',
+      then: Joi.string().min(10).required(),
+      otherwise: Joi.string()
+    })
+    .messages({
+      'string.min': 'Rejection reason must be at least 10 characters',
+      'string.max': 'Notes cannot exceed 1000 characters'
+    }),
+  
+  verificationDetails: Joi.object({
+    documentsVerified: Joi.boolean()
+      .required(),
+    
+    complianceChecked: Joi.boolean()
+      .required(),
+    
+    riskAssessment: Joi.string()
+      .valid('low', 'medium', 'high')
+      .messages({
+        'any.only': 'Risk assessment must be low, medium, or high'
+      })
+  }).when('action', {
+    is: 'verify',
+    then: Joi.required(),
+    otherwise: Joi.forbidden()
+  })
+});
+
+export const invoiceSearchSchema = Joi.object({
+  status: Joi.alternatives().try(
+    Joi.string().valid('draft', 'submitted', 'anchor_approved', 'admin_verified', 'listed', 'funded', 'repaid', 'settled', 'rejected'),
+    Joi.array().items(Joi.string().valid('draft', 'submitted', 'anchor_approved', 'admin_verified', 'listed', 'funded', 'repaid', 'settled', 'rejected'))
+  ),
+  
+  sellerId: Joi.string().pattern(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/),
+  anchorId: Joi.string().pattern(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/),
+  fundedBy: Joi.string().pattern(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/),
+  
+  minAmount: Joi.number().positive(),
+  maxAmount: Joi.number().positive().greater(Joi.ref('minAmount')),
+  currency: Joi.string().valid('NGN', 'USD', 'EUR', 'GBP'),
+  
+  dateFrom: Joi.date(),
+  dateTo: Joi.date().greater(Joi.ref('dateFrom')),
+  dueDateFrom: Joi.date(),
+  dueDateTo: Joi.date().greater(Joi.ref('dueDateFrom')),
+  
+  search: Joi.string().min(3).max(100),
+  
+  sortBy: Joi.string().valid('createdAt', 'amount', 'dueDate', 'submittedAt', 'approvedAt').default('createdAt'),
+  sortOrder: Joi.string().valid('asc', 'desc').default('desc'),
+  
+  page: Joi.number().integer().min(1).default(1),
+  limit: Joi.number().integer().min(1).max(100).default(20)
+});
+
+export const marketplaceFiltersSchema = Joi.object({
+  minAmount: Joi.number().positive(),
+  maxAmount: Joi.number().positive().greater(Joi.ref('minAmount')),
+  currency: Joi.string().valid('NGN', 'USD', 'EUR', 'GBP'),
+  anchorId: Joi.string().pattern(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/),
+  maxDaysUntilDue: Joi.number().integer().positive(),
+  
+  sortBy: Joi.string().valid('listedAt', 'amount', 'dueDate', 'offerCount').default('listedAt'),
+  sortOrder: Joi.string().valid('asc', 'desc').default('desc'),
+  
+  page: Joi.number().integer().min(1).default(1),
+  limit: Joi.number().integer().min(1).max(50).default(20)
+});
+
+export const bulkStatusUpdateSchema = Joi.object({
+  invoiceIds: Joi.array()
+    .items(Joi.string().pattern(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/))
+    .min(1)
+    .max(100)
+    .required()
+    .messages({
+      'array.min': 'At least one invoice ID is required',
+      'array.max': 'Cannot update more than 100 invoices at once'
+    }),
+  
+  newStatus: Joi.string()
+    .valid('admin_verified', 'listed', 'rejected')
+    .required(),
+  
+  notes: Joi.string()
+    .max(500)
+    .allow('')
+});

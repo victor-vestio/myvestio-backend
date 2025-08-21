@@ -1,6 +1,16 @@
 import { Request, Response, NextFunction } from 'express';
 import Joi from 'joi';
 import { ApiResponse } from '../interfaces/common';
+import {
+  createInvoiceSchema,
+  updateInvoiceSchema,
+  submitInvoiceSchema,
+  anchorApprovalSchema,
+  adminVerificationSchema,
+  invoiceSearchSchema,
+  marketplaceFiltersSchema,
+  bulkStatusUpdateSchema
+} from '../utils/validators';
 
 export const validateRequest = (schema: Joi.ObjectSchema) => {
   return (req: Request, res: Response<ApiResponse>, next: NextFunction) => {
@@ -79,3 +89,13 @@ export const validateParams = (schema: Joi.ObjectSchema) => {
     next();
   };
 };
+
+// Export validation middleware functions
+export const validateCreateInvoice = validateRequest(createInvoiceSchema);
+export const validateUpdateInvoice = validateRequest(updateInvoiceSchema);
+export const validateSubmitInvoice = validateRequest(submitInvoiceSchema);
+export const validateAnchorApproval = validateRequest(anchorApprovalSchema);
+export const validateAdminVerification = validateRequest(adminVerificationSchema);
+export const validateInvoiceSearch = validateQuery(invoiceSearchSchema);
+export const validateMarketplaceFilters = validateQuery(marketplaceFiltersSchema);
+export const validateBulkStatusUpdate = validateRequest(bulkStatusUpdateSchema);
