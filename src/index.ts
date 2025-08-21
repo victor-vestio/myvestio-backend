@@ -10,6 +10,7 @@ import { configureCloudinary } from './config/cloudinary';
 import { configureResend } from './config/resend';
 import authRoutes from './routes/auth';
 import { kycRouter } from './routes/kyc';
+import invoiceRoutes from './routes/invoices';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -32,6 +33,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/kyc', kycRouter);
+app.use('/api/invoices', invoiceRoutes);
 
 app.get('/', (req, res) => {
   res.json({ 

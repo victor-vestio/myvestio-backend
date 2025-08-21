@@ -122,6 +122,39 @@ export class EmailService {
     });
   }
 
+  static async sendInvoiceStatusUpdate(user: IUser, invoice: any, status: string, message?: string): Promise<boolean> {
+    const template = this.getInvoiceStatusUpdateTemplate(user, invoice, status, message);
+    
+    return await this.sendEmail({
+      to: user.email,
+      subject: template.subject,
+      html: template.htmlContent,
+      text: template.textContent
+    });
+  }
+
+  static async sendInvoiceSubmittedNotification(anchor: IUser, invoice: any, seller: IUser): Promise<boolean> {
+    const template = this.getInvoiceSubmittedTemplate(anchor, invoice, seller);
+    
+    return await this.sendEmail({
+      to: anchor.email,
+      subject: template.subject,
+      html: template.htmlContent,
+      text: template.textContent
+    });
+  }
+
+  static async sendInvoiceListedNotification(lender: IUser, invoice: any): Promise<boolean> {
+    const template = this.getInvoiceListedTemplate(lender, invoice);
+    
+    return await this.sendEmail({
+      to: lender.email,
+      subject: template.subject,
+      html: template.htmlContent,
+      text: template.textContent
+    });
+  }
+
   private static getWelcomeTemplate(user: IUser, verificationToken?: string): EmailTemplate {
     const verificationLink = verificationToken 
       ? `${this.frontendUrl}/verify-email?token=${verificationToken}`
@@ -613,6 +646,282 @@ export class EmailService {
 
     return {
       subject: `${statusTitle} - Vestio`,
+      htmlContent,
+      textContent
+    };
+  }
+
+  private static getInvoiceStatusUpdateTemplate(user: IUser, invoice: any, status: string, message?: string): EmailTemplate {
+    const invoiceLink = `${this.frontendUrl}/invoices/${invoice._id || invoice.id}`;
+    const dashboardLink = `${this.frontendUrl}/dashboard`;
+
+    const statusMap: { [key: string]: { title: string; color: string; description: string; action: string } } = {
+      'submitted': {
+        title: 'Invoice Submitted for Review',
+        color: '#3498db',
+        description: 'Your invoice has been submitted and is awaiting anchor approval.',
+        action: 'Track Progress'
+      },
+      'anchor_approved': {
+        title: 'Invoice Approved by Anchor',
+        color: '#2ecc71',
+        description: 'Great news! Your anchor has approved your invoice. It will now undergo admin verification.',
+        action: 'View Details'
+      },
+      'admin_verified': {
+        title: 'Invoice Verified - Ready for Listing',
+        color: '#27ae60',
+        description: 'Your invoice has been verified by our team and is ready to be listed in the marketplace.',
+        action: 'View Invoice'
+      },
+      'listed': {
+        title: 'Invoice Listed in Marketplace',
+        color: '#f39c12',
+        description: 'Your invoice is now live in the marketplace and available for funding by lenders.',
+        action: 'View Marketplace'
+      },
+      'funded': {
+        title: 'Invoice Successfully Funded',
+        color: '#e74c3c',
+        description: 'Congratulations! Your invoice has been funded. Funds will be disbursed to your account shortly.',
+        action: 'View Transaction'
+      },
+      'rejected': {
+        title: 'Invoice Requires Attention',
+        color: '#e74c3c',
+        description: 'Your invoice requires some updates before it can proceed further.',
+        action: 'Update Invoice'
+      }
+    };
+
+    const statusInfo = statusMap[status] || {
+      title: 'Invoice Status Update',
+      color: '#95a5a6',
+      description: 'Your invoice status has been updated.',
+      action: 'View Invoice'
+    };
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>${statusInfo.title}</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h1 style="color: ${statusInfo.color};">${statusInfo.title}</h1>
+          
+          <p>Hello ${user.firstName},</p>
+          
+          <p>${statusInfo.description}</p>
+          
+          ${message ? `<div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; border-left: 4px solid ${statusInfo.color}; margin: 20px 0;">
+            <p style="margin: 0; font-style: italic;">${message}</p>
+          </div>` : ''}
+          
+          <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
+            <h3>Invoice Details:</h3>
+            <p><strong>Invoice Number:</strong> ${invoice._id}</p>
+            <p><strong>Amount:</strong> ${invoice.currency} ${invoice.amount?.toLocaleString()}</p>
+            <p><strong>Due Date:</strong> ${new Date(invoice.dueDate).toLocaleDateString()}</p>
+            <p><strong>Status:</strong> ${status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ')}</p>
+          </div>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${invoiceLink}" style="background-color: ${statusInfo.color}; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">${statusInfo.action}</a>
+          </div>
+          
+          <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin-top: 30px;">
+            <h4>Next Steps:</h4>
+            <p style="margin: 5px 0;">
+              ${status === 'submitted' ? 'Your anchor will review the invoice and either approve or request changes.' :
+                status === 'anchor_approved' ? 'Our admin team will verify the invoice details and documents.' :
+                status === 'admin_verified' ? 'The invoice will be listed in the marketplace shortly.' :
+                status === 'listed' ? 'Lenders can now view and fund your invoice.' :
+                status === 'funded' ? 'Monitor your dashboard for disbursement updates.' :
+                status === 'rejected' ? 'Review the feedback and update your invoice as needed.' :
+                'Check your dashboard for the latest updates.'}
+            </p>
+          </div>
+          
+          <p style="margin-top: 30px;">Best regards,<br>The Vestio Team</p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const textContent = `
+      ${statusInfo.title}
+      
+      Hello ${user.firstName},
+      
+      ${statusInfo.description}
+      
+      ${message ? `Message: ${message}\n` : ''}
+      
+      Invoice Details:
+      - Invoice Number: ${invoice._id}
+      - Amount: ${invoice.currency} ${invoice.amount?.toLocaleString()}
+      - Due Date: ${new Date(invoice.dueDate).toLocaleDateString()}
+      - Status: ${status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ')}
+      
+      View invoice: ${invoiceLink}
+      
+      Best regards,
+      The Vestio Team
+    `;
+
+    return {
+      subject: `${statusInfo.title} - Invoice ${invoice._id}`,
+      htmlContent,
+      textContent
+    };
+  }
+
+  private static getInvoiceSubmittedTemplate(anchor: IUser, invoice: any, seller: IUser): EmailTemplate {
+    const reviewLink = `${this.frontendUrl}/anchor/pending-approvals`;
+    const invoiceLink = `${this.frontendUrl}/invoices/${invoice._id || invoice.id}`;
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>New Invoice Submitted for Review</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h1 style="color: #3498db;">New Invoice Submitted for Review</h1>
+          
+          <p>Hello ${anchor.firstName},</p>
+          
+          <p>A new invoice has been submitted by <strong>${seller.firstName} ${seller.lastName}</strong> and requires your approval.</p>
+          
+          <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
+            <h3>Invoice Details:</h3>
+            <p><strong>Invoice Number:</strong> ${invoice._id}</p>
+            <p><strong>Seller:</strong> ${seller.firstName} ${seller.lastName} ${seller.businessName ? `(${seller.businessName})` : ''}</p>
+            <p><strong>Amount:</strong> ${invoice.currency} ${invoice.amount?.toLocaleString()}</p>
+            <p><strong>Due Date:</strong> ${new Date(invoice.dueDate).toLocaleDateString()}</p>
+            <p><strong>Description:</strong> ${invoice.description}</p>
+          </div>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${reviewLink}" style="background-color: #3498db; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold; margin-right: 10px;">Review Invoice</a>
+            <a href="${invoiceLink}" style="background-color: #95a5a6; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">View Details</a>
+          </div>
+          
+          <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; border-left: 4px solid #ffc107; margin-top: 30px;">
+            <h4>Action Required:</h4>
+            <p style="margin: 5px 0;">Please review the invoice and supporting documents, then approve or reject with appropriate feedback.</p>
+          </div>
+          
+          <p style="margin-top: 30px;">Best regards,<br>The Vestio Team</p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const textContent = `
+      New Invoice Submitted for Review
+      
+      Hello ${anchor.firstName},
+      
+      A new invoice has been submitted by ${seller.firstName} ${seller.lastName} and requires your approval.
+      
+      Invoice Details:
+      - Invoice Number: ${invoice._id}
+      - Seller: ${seller.firstName} ${seller.lastName} ${seller.businessName ? `(${seller.businessName})` : ''}
+      - Amount: ${invoice.currency} ${invoice.amount?.toLocaleString()}
+      - Due Date: ${new Date(invoice.dueDate).toLocaleDateString()}
+      - Description: ${invoice.description}
+      
+      Review pending approvals: ${reviewLink}
+      
+      Best regards,
+      The Vestio Team
+    `;
+
+    return {
+      subject: `New Invoice Submitted - ${invoice._id}`,
+      htmlContent,
+      textContent
+    };
+  }
+
+  private static getInvoiceListedTemplate(lender: IUser, invoice: any): EmailTemplate {
+    const marketplaceLink = `${this.frontendUrl}/marketplace`;
+    const invoiceLink = `${this.frontendUrl}/marketplace/invoices/${invoice._id || invoice.id}`;
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>New Investment Opportunity Available</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h1 style="color: #f39c12;">New Investment Opportunity Available</h1>
+          
+          <p>Hello ${lender.firstName},</p>
+          
+          <p>A new invoice has been listed in the marketplace that matches your investment criteria.</p>
+          
+          <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
+            <h3>Investment Opportunity:</h3>
+            <p><strong>Invoice Number:</strong> ${invoice._id}</p>
+            <p><strong>Amount:</strong> ${invoice.currency} ${invoice.amount?.toLocaleString()}</p>
+            <p><strong>Due Date:</strong> ${new Date(invoice.dueDate).toLocaleDateString()}</p>
+            <p><strong>Days Until Due:</strong> ${invoice.daysUntilDue} days</p>
+            <p><strong>Anchor:</strong> ${invoice.anchor?.businessName || `${invoice.anchor?.firstName} ${invoice.anchor?.lastName}`}</p>
+          </div>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${invoiceLink}" style="background-color: #f39c12; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold; margin-right: 10px;">View Investment</a>
+            <a href="${marketplaceLink}" style="background-color: #95a5a6; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">Browse Marketplace</a>
+          </div>
+          
+          <div style="background-color: #d1ecf1; padding: 15px; border-radius: 5px; border-left: 4px solid #bee5eb; margin-top: 30px;">
+            <h4>Investment Highlights:</h4>
+            <ul style="margin: 5px 0;">
+              <li>Verified invoice with anchor approval</li>
+              <li>Secure transaction processing</li>
+              <li>Transparent fee structure</li>
+              <li>Professional dispute resolution</li>
+            </ul>
+          </div>
+          
+          <p style="margin-top: 30px;">Best regards,<br>The Vestio Investment Team</p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const textContent = `
+      New Investment Opportunity Available
+      
+      Hello ${lender.firstName},
+      
+      A new invoice has been listed in the marketplace that matches your investment criteria.
+      
+      Investment Opportunity:
+      - Invoice Number: ${invoice._id}
+      - Amount: ${invoice.currency} ${invoice.amount?.toLocaleString()}
+      - Due Date: ${new Date(invoice.dueDate).toLocaleDateString()}
+      - Days Until Due: ${invoice.daysUntilDue} days
+      - Anchor: ${invoice.anchor?.businessName || `${invoice.anchor?.firstName} ${invoice.anchor?.lastName}`}
+      
+      View investment: ${invoiceLink}
+      Browse marketplace: ${marketplaceLink}
+      
+      Best regards,
+      The Vestio Investment Team
+    `;
+
+    return {
+      subject: `New Investment Opportunity - ${invoice._id}`,
       htmlContent,
       textContent
     };
