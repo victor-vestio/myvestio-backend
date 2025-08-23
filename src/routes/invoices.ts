@@ -121,6 +121,17 @@ router.get(
 );
 
 /**
+ * @route GET /api/invoices/:id/anchor-document
+ * @desc Get invoice document for anchor review (main document only)
+ * @access Anchor only (assigned invoices)
+ */
+router.get(
+  '/:id/anchor-document',
+  requireRole(UserRole.ANCHOR),
+  InvoiceController.getAnchorInvoiceDocument
+);
+
+/**
  * @route POST /api/invoices/:id/anchor-approval
  * @desc Approve or reject invoice
  * @access Anchor only (assigned invoices)
@@ -187,38 +198,55 @@ router.get(
 // MARKETPLACE ENDPOINTS
 // ============================================
 
+
+
+// ============================================
+// ANALYTICS AND REPORTING (BEFORE WILDCARD ROUTES)
+// ============================================
+
+/**
+ * @route GET /api/invoices/analytics/overview
+ * @desc Get invoice analytics overview
+ * @access Private (role-based data)
+ */
+router.get(
+  '/analytics/overview',
+  InvoiceController.getInvoiceAnalytics
+);
+
+
+// ============================================
+// MARKETPLACE ROUTE REJECTION
+// ============================================
+
 /**
  * @route GET /api/invoices/marketplace
- * @desc Get available invoices in marketplace
- * @access Lender only
+ * @desc Explicitly reject marketplace requests - use /api/marketplace instead
+ * @access Public
  */
 router.get(
   '/marketplace',
-  requireRole(UserRole.LENDER),
-  InvoiceController.getMarketplaceInvoices
+  (req, res) => {
+    res.status(404).json({
+      success: false,
+      message: 'Marketplace endpoints have been moved to /api/marketplace'
+    });
+  }
 );
 
 /**
  * @route GET /api/invoices/marketplace/trending
- * @desc Get trending invoices
- * @access Lender only
+ * @desc Explicitly reject marketplace trending requests - use /api/marketplace instead
+ * @access Public
  */
 router.get(
   '/marketplace/trending',
-  requireRole(UserRole.LENDER),
-  InvoiceController.getTrendingInvoices
-);
-
-/**
- * @route POST /api/invoices/:id/list
- * @desc List verified invoice to marketplace
- * @access Admin only
- */
-router.post(
-  '/:id/list',
-  requireRole(UserRole.ADMIN),
-  invoiceActionRateLimit,
-  InvoiceController.listInvoiceToMarketplace
+  (req, res) => {
+    res.status(404).json({
+      success: false,
+      message: 'Marketplace endpoints have been moved to /api/marketplace'
+    });
+  }
 );
 
 // ============================================
@@ -266,92 +294,6 @@ router.get(
 );
 
 // ============================================
-// ANALYTICS AND REPORTING
-// ============================================
-
-/**
- * @route GET /api/invoices/analytics/overview
- * @desc Get invoice analytics overview
- * @access Private (role-based data)
- */
-router.get(
-  '/analytics/overview',
-  InvoiceController.getInvoiceAnalytics
-);
-
-/**
- * @route GET /api/invoices/analytics/performance
- * @desc Get performance metrics
- * @access Admin only
- */
-router.get(
-  '/analytics/performance',
-  requireRole(UserRole.ADMIN),
-  InvoiceController.getPerformanceMetrics
-);
-
-/**
- * @route GET /api/invoices/analytics/trends
- * @desc Get market trends
- * @access Private
- */
-router.get(
-  '/analytics/trends',
-  InvoiceController.getMarketTrends
-);
-
-// ============================================
-// SEARCH AND FILTERING
-// ============================================
-
-/**
- * @route POST /api/invoices/search
- * @desc Advanced invoice search
- * @access Private (role-based results)
- */
-router.post(
-  '/search',
-  InvoiceController.searchInvoices
-);
-
-/**
- * @route GET /api/invoices/filters/options
- * @desc Get available filter options
- * @access Private
- */
-router.get(
-  '/filters/options',
-  InvoiceController.getFilterOptions
-);
-
-// ============================================
-// BULK OPERATIONS (Admin only)
-// ============================================
-
-/**
- * @route POST /api/invoices/bulk/status-update
- * @desc Bulk status update
- * @access Admin only
- */
-router.post(
-  '/bulk/status-update',
-  requireRole(UserRole.ADMIN),
-  invoiceActionRateLimit,
-  InvoiceController.bulkStatusUpdate
-);
-
-/**
- * @route POST /api/invoices/bulk/export
- * @desc Export invoices data
- * @access Admin only
- */
-router.post(
-  '/bulk/export',
-  requireRole(UserRole.ADMIN),
-  InvoiceController.exportInvoices
-);
-
-// ============================================
 // SUPPORTING DOCUMENTS
 // ============================================
 
@@ -380,29 +322,5 @@ router.delete(
   InvoiceController.deleteSupportingDocument
 );
 
-// ============================================
-// REAL-TIME UPDATES
-// ============================================
-
-/**
- * @route GET /api/invoices/:id/subscribe
- * @desc Subscribe to real-time invoice updates
- * @access Private (role-based access)
- */
-router.get(
-  '/:id/subscribe',
-  InvoiceController.subscribeToInvoiceUpdates
-);
-
-/**
- * @route POST /api/invoices/:id/notify
- * @desc Send custom notification
- * @access Admin only
- */
-router.post(
-  '/:id/notify',
-  requireRole(UserRole.ADMIN),
-  InvoiceController.sendCustomNotification
-);
 
 export default router;

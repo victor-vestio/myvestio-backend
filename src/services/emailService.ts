@@ -155,6 +155,98 @@ export class EmailService {
     });
   }
 
+  // ============================================
+  // MARKETPLACE-SPECIFIC NOTIFICATIONS
+  // ============================================
+
+  static async sendNewOfferNotification(seller: IUser, invoice: any, offer: any, lender: IUser): Promise<boolean> {
+    const template = this.getNewOfferTemplate(seller, invoice, offer, lender);
+    
+    return await this.sendEmail({
+      to: seller.email,
+      subject: template.subject,
+      html: template.htmlContent,
+      text: template.textContent
+    });
+  }
+
+  static async sendOfferAcceptedNotification(lender: IUser, invoice: any, offer: any, seller: IUser): Promise<boolean> {
+    const template = this.getOfferAcceptedTemplate(lender, invoice, offer, seller);
+    
+    return await this.sendEmail({
+      to: lender.email,
+      subject: template.subject,
+      html: template.htmlContent,
+      text: template.textContent
+    });
+  }
+
+  static async sendOfferRejectedNotification(lender: IUser, invoice: any, offer: any, reason?: string): Promise<boolean> {
+    const template = this.getOfferRejectedTemplate(lender, invoice, offer, reason);
+    
+    return await this.sendEmail({
+      to: lender.email,
+      subject: template.subject,
+      html: template.htmlContent,
+      text: template.textContent
+    });
+  }
+
+  static async sendOfferWithdrawnNotification(seller: IUser, invoice: any, offer: any, lender: IUser, reason?: string): Promise<boolean> {
+    const template = this.getOfferWithdrawnTemplate(seller, invoice, offer, lender, reason);
+    
+    return await this.sendEmail({
+      to: seller.email,
+      subject: template.subject,
+      html: template.htmlContent,
+      text: template.textContent
+    });
+  }
+
+  static async sendOfferExpiredNotification(lender: IUser, invoice: any, offer: any): Promise<boolean> {
+    const template = this.getOfferExpiredTemplate(lender, invoice, offer);
+    
+    return await this.sendEmail({
+      to: lender.email,
+      subject: template.subject,
+      html: template.htmlContent,
+      text: template.textContent
+    });
+  }
+
+  static async sendCompetitiveOfferAlert(lender: IUser, invoice: any, yourOffer: any, betterOffer: any): Promise<boolean> {
+    const template = this.getCompetitiveOfferAlertTemplate(lender, invoice, yourOffer, betterOffer);
+    
+    return await this.sendEmail({
+      to: lender.email,
+      subject: template.subject,
+      html: template.htmlContent,
+      text: template.textContent
+    });
+  }
+
+  static async sendMultipleOffersAlert(seller: IUser, invoice: any, offerCount: number): Promise<boolean> {
+    const template = this.getMultipleOffersAlertTemplate(seller, invoice, offerCount);
+    
+    return await this.sendEmail({
+      to: seller.email,
+      subject: template.subject,
+      html: template.htmlContent,
+      text: template.textContent
+    });
+  }
+
+  static async sendInvoiceFundedNotification(user: IUser, invoice: any, offer: any, lender: IUser): Promise<boolean> {
+    const template = this.getInvoiceFundedTemplate(user, invoice, offer, lender);
+    
+    return await this.sendEmail({
+      to: user.email,
+      subject: template.subject,
+      html: template.htmlContent,
+      text: template.textContent
+    });
+  }
+
   private static getWelcomeTemplate(user: IUser, verificationToken?: string): EmailTemplate {
     const verificationLink = verificationToken 
       ? `${this.frontendUrl}/verify-email?token=${verificationToken}`
@@ -922,6 +1014,601 @@ export class EmailService {
 
     return {
       subject: `New Investment Opportunity - ${invoice._id}`,
+      htmlContent,
+      textContent
+    };
+  }
+
+  // ============================================
+  // MARKETPLACE TEMPLATE METHODS
+  // ============================================
+
+  private static getNewOfferTemplate(seller: IUser, invoice: any, offer: any, lender: IUser): EmailTemplate {
+    const invoiceLink = `${this.frontendUrl}/seller/invoices/${invoice._id}/offers`;
+    const offersLink = `${this.frontendUrl}/seller/invoices/${invoice._id}/offers`;
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>New Offer Received - Vestio</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h1 style="color: #27ae60;">🎉 New Offer Received!</h1>
+          
+          <p>Hello ${seller.firstName},</p>
+          
+          <p>Great news! You've received a new funding offer for your invoice.</p>
+          
+          <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
+            <h3>Offer Details:</h3>
+            <p><strong>Invoice:</strong> ${invoice._id}</p>
+            <p><strong>Lender:</strong> ${lender.firstName} ${lender.lastName} ${lender.businessName ? `(${lender.businessName})` : ''}</p>
+            <p><strong>Funding Amount:</strong> ₦${offer.amount?.toLocaleString()}</p>
+            <p><strong>Interest Rate:</strong> ${offer.interestRate}% per annum</p>
+            <p><strong>Tenure:</strong> ${offer.tenure} days</p>
+            <p><strong>Funding Percentage:</strong> ${offer.fundingPercentage}%</p>
+          </div>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${offersLink}" style="background-color: #27ae60; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">Review Offer</a>
+          </div>
+          
+          <div style="background-color: #d4edda; padding: 15px; border-radius: 5px; border-left: 4px solid #27ae60; margin-top: 30px;">
+            <h4>💡 Next Steps:</h4>
+            <p style="margin: 5px 0;">Review the offer details and either accept or reject it. Remember, you can negotiate terms or wait for better offers!</p>
+          </div>
+          
+          <p style="margin-top: 30px;">Best regards,<br>The Vestio Marketplace Team</p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const textContent = `
+      New Offer Received!
+      
+      Hello ${seller.firstName},
+      
+      You've received a new funding offer for your invoice.
+      
+      Offer Details:
+      - Invoice: ${invoice._id}
+      - Lender: ${lender.firstName} ${lender.lastName} ${lender.businessName ? `(${lender.businessName})` : ''}
+      - Funding Amount: ₦${offer.amount?.toLocaleString()}
+      - Interest Rate: ${offer.interestRate}% per annum
+      - Tenure: ${offer.tenure} days
+      - Funding Percentage: ${offer.fundingPercentage}%
+      
+      Review offer: ${offersLink}
+      
+      Best regards,
+      The Vestio Marketplace Team
+    `;
+
+    return {
+      subject: `New Offer Received - Invoice ${invoice._id}`,
+      htmlContent,
+      textContent
+    };
+  }
+
+  private static getOfferAcceptedTemplate(lender: IUser, invoice: any, offer: any, seller: IUser): EmailTemplate {
+    const dashboardLink = `${this.frontendUrl}/lender/portfolio`;
+    const offerLink = `${this.frontendUrl}/lender/offers/${offer._id}`;
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Offer Accepted - Vestio</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h1 style="color: #27ae60;">🎉 Congratulations! Your Offer Was Accepted</h1>
+          
+          <p>Hello ${lender.firstName},</p>
+          
+          <p>Excellent news! <strong>${seller.firstName} ${seller.lastName}</strong> has accepted your funding offer.</p>
+          
+          <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
+            <h3>Accepted Offer Details:</h3>
+            <p><strong>Invoice:</strong> ${invoice._id}</p>
+            <p><strong>Funding Amount:</strong> ₦${offer.amount?.toLocaleString()}</p>
+            <p><strong>Interest Rate:</strong> ${offer.interestRate}% per annum</p>
+            <p><strong>Tenure:</strong> ${offer.tenure} days</p>
+            <p><strong>Expected Return:</strong> ₦${offer.totalRepaymentAmount?.toLocaleString() || 'Calculating...'}</p>
+          </div>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${offerLink}" style="background-color: #27ae60; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">View Investment</a>
+          </div>
+          
+          <div style="background-color: #d1ecf1; padding: 15px; border-radius: 5px; border-left: 4px solid #bee5eb; margin-top: 30px;">
+            <h4>📋 What Happens Next:</h4>
+            <ul style="margin: 5px 0;">
+              <li>Funds will be transferred to the seller within 24 hours</li>
+              <li>You'll receive repayment on the due date</li>
+              <li>Track your investment in your portfolio dashboard</li>
+            </ul>
+          </div>
+          
+          <p style="margin-top: 30px;">Best regards,<br>The Vestio Investment Team</p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const textContent = `
+      Congratulations! Your Offer Was Accepted
+      
+      Hello ${lender.firstName},
+      
+      ${seller.firstName} ${seller.lastName} has accepted your funding offer.
+      
+      Accepted Offer Details:
+      - Invoice: ${invoice._id}
+      - Funding Amount: ₦${offer.amount?.toLocaleString()}
+      - Interest Rate: ${offer.interestRate}% per annum
+      - Tenure: ${offer.tenure} days
+      - Expected Return: ₦${offer.totalRepaymentAmount?.toLocaleString() || 'Calculating...'}
+      
+      View investment: ${offerLink}
+      
+      Best regards,
+      The Vestio Investment Team
+    `;
+
+    return {
+      subject: `Offer Accepted - Invoice ${invoice._id}`,
+      htmlContent,
+      textContent
+    };
+  }
+
+  private static getOfferRejectedTemplate(lender: IUser, invoice: any, offer: any, reason?: string): EmailTemplate {
+    const marketplaceLink = `${this.frontendUrl}/marketplace`;
+    const invoiceLink = `${this.frontendUrl}/marketplace/invoices/${invoice._id}`;
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Offer Update - Vestio</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h1 style="color: #e74c3c;">Offer Not Selected</h1>
+          
+          <p>Hello ${lender.firstName},</p>
+          
+          <p>Thank you for your interest in funding invoice ${invoice._id}. Unfortunately, your offer was not selected by the seller.</p>
+          
+          <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
+            <h3>Your Offer Details:</h3>
+            <p><strong>Invoice:</strong> ${invoice._id}</p>
+            <p><strong>Your Offer Amount:</strong> ₦${offer.amount?.toLocaleString()}</p>
+            <p><strong>Your Interest Rate:</strong> ${offer.interestRate}% per annum</p>
+            <p><strong>Your Tenure:</strong> ${offer.tenure} days</p>
+          </div>
+          
+          ${reason ? `<div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; border-left: 4px solid #ffc107; margin: 20px 0;">
+            <h4>Seller's Feedback:</h4>
+            <p style="margin: 0; font-style: italic;">${reason}</p>
+          </div>` : ''}
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${marketplaceLink}" style="background-color: #3498db; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">Explore More Opportunities</a>
+          </div>
+          
+          <div style="background-color: #d4edda; padding: 15px; border-radius: 5px; border-left: 4px solid #27ae60; margin-top: 30px;">
+            <h4>💡 Keep Investing:</h4>
+            <p style="margin: 5px 0;">Don't be discouraged! There are many other great investment opportunities in the marketplace. Consider adjusting your rates to be more competitive.</p>
+          </div>
+          
+          <p style="margin-top: 30px;">Best regards,<br>The Vestio Investment Team</p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const textContent = `
+      Offer Not Selected
+      
+      Hello ${lender.firstName},
+      
+      Your offer for invoice ${invoice._id} was not selected by the seller.
+      
+      Your Offer Details:
+      - Invoice: ${invoice._id}
+      - Your Offer Amount: ₦${offer.amount?.toLocaleString()}
+      - Your Interest Rate: ${offer.interestRate}% per annum
+      - Your Tenure: ${offer.tenure} days
+      
+      ${reason ? `Seller's Feedback: ${reason}\n` : ''}
+      
+      Explore more opportunities: ${marketplaceLink}
+      
+      Best regards,
+      The Vestio Investment Team
+    `;
+
+    return {
+      subject: `Offer Update - Invoice ${invoice._id}`,
+      htmlContent,
+      textContent
+    };
+  }
+
+  private static getOfferWithdrawnTemplate(seller: IUser, invoice: any, offer: any, lender: IUser, reason?: string): EmailTemplate {
+    const invoiceOffersLink = `${this.frontendUrl}/seller/invoices/${invoice._id}/offers`;
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Offer Withdrawn - Vestio</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h1 style="color: #f39c12;">Offer Withdrawn</h1>
+          
+          <p>Hello ${seller.firstName},</p>
+          
+          <p><strong>${lender.firstName} ${lender.lastName}</strong> has withdrawn their offer for your invoice ${invoice._id}.</p>
+          
+          <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
+            <h3>Withdrawn Offer Details:</h3>
+            <p><strong>Lender:</strong> ${lender.firstName} ${lender.lastName} ${lender.businessName ? `(${lender.businessName})` : ''}</p>
+            <p><strong>Offer Amount:</strong> ₦${offer.amount?.toLocaleString()}</p>
+            <p><strong>Interest Rate:</strong> ${offer.interestRate}% per annum</p>
+            <p><strong>Tenure:</strong> ${offer.tenure} days</p>
+          </div>
+          
+          ${reason ? `<div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; border-left: 4px solid #ffc107; margin: 20px 0;">
+            <h4>Withdrawal Reason:</h4>
+            <p style="margin: 0; font-style: italic;">${reason}</p>
+          </div>` : ''}
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${invoiceOffersLink}" style="background-color: #3498db; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">View Remaining Offers</a>
+          </div>
+          
+          <div style="background-color: #d4edda; padding: 15px; border-radius: 5px; border-left: 4px solid #27ae60; margin-top: 30px;">
+            <h4>💡 Don't Worry:</h4>
+            <p style="margin: 5px 0;">Your invoice is still listed in the marketplace and available for other lenders to fund. More offers may come in!</p>
+          </div>
+          
+          <p style="margin-top: 30px;">Best regards,<br>The Vestio Marketplace Team</p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const textContent = `
+      Offer Withdrawn
+      
+      Hello ${seller.firstName},
+      
+      ${lender.firstName} ${lender.lastName} has withdrawn their offer for your invoice ${invoice._id}.
+      
+      Withdrawn Offer Details:
+      - Lender: ${lender.firstName} ${lender.lastName} ${lender.businessName ? `(${lender.businessName})` : ''}
+      - Offer Amount: ₦${offer.amount?.toLocaleString()}
+      - Interest Rate: ${offer.interestRate}% per annum
+      - Tenure: ${offer.tenure} days
+      
+      ${reason ? `Withdrawal Reason: ${reason}\n` : ''}
+      
+      View remaining offers: ${invoiceOffersLink}
+      
+      Best regards,
+      The Vestio Marketplace Team
+    `;
+
+    return {
+      subject: `Offer Withdrawn - Invoice ${invoice._id}`,
+      htmlContent,
+      textContent
+    };
+  }
+
+  private static getOfferExpiredTemplate(lender: IUser, invoice: any, offer: any): EmailTemplate {
+    const marketplaceLink = `${this.frontendUrl}/marketplace`;
+    const invoiceLink = `${this.frontendUrl}/marketplace/invoices/${invoice._id}`;
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Offer Expired - Vestio</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h1 style="color: #95a5a6;">⏰ Your Offer Has Expired</h1>
+          
+          <p>Hello ${lender.firstName},</p>
+          
+          <p>Your offer for invoice ${invoice._id} has expired and is no longer active.</p>
+          
+          <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
+            <h3>Expired Offer Details:</h3>
+            <p><strong>Invoice:</strong> ${invoice._id}</p>
+            <p><strong>Your Offer Amount:</strong> ₦${offer.amount?.toLocaleString()}</p>
+            <p><strong>Your Interest Rate:</strong> ${offer.interestRate}% per annum</p>
+            <p><strong>Expired At:</strong> ${new Date(offer.expiresAt).toLocaleString()}</p>
+          </div>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${invoiceLink}" style="background-color: #27ae60; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold; margin-right: 10px;">Make New Offer</a>
+            <a href="${marketplaceLink}" style="background-color: #3498db; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">Explore Marketplace</a>
+          </div>
+          
+          <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; border-left: 4px solid #ffc107; margin-top: 30px;">
+            <h4>💡 Pro Tip:</h4>
+            <p style="margin: 5px 0;">Set longer expiry times for your offers to give sellers more time to consider them. You can also create a new offer with updated terms!</p>
+          </div>
+          
+          <p style="margin-top: 30px;">Best regards,<br>The Vestio Investment Team</p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const textContent = `
+      Your Offer Has Expired
+      
+      Hello ${lender.firstName},
+      
+      Your offer for invoice ${invoice._id} has expired and is no longer active.
+      
+      Expired Offer Details:
+      - Invoice: ${invoice._id}
+      - Your Offer Amount: ₦${offer.amount?.toLocaleString()}
+      - Your Interest Rate: ${offer.interestRate}% per annum
+      - Expired At: ${new Date(offer.expiresAt).toLocaleString()}
+      
+      Make new offer: ${invoiceLink}
+      Explore marketplace: ${marketplaceLink}
+      
+      Best regards,
+      The Vestio Investment Team
+    `;
+
+    return {
+      subject: `Offer Expired - Invoice ${invoice._id}`,
+      htmlContent,
+      textContent
+    };
+  }
+
+  private static getCompetitiveOfferAlertTemplate(lender: IUser, invoice: any, yourOffer: any, betterOffer: any): EmailTemplate {
+    const offerLink = `${this.frontendUrl}/lender/offers/${yourOffer._id}`;
+    const marketplaceLink = `${this.frontendUrl}/marketplace/invoices/${invoice._id}`;
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Competitive Alert - Vestio</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h1 style="color: #f39c12;">⚡ You've Been Outbid!</h1>
+          
+          <p>Hello ${lender.firstName},</p>
+          
+          <p>Another lender has submitted a better offer for invoice ${invoice._id}. You may want to improve your offer to stay competitive!</p>
+          
+          <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
+            <h3>Offer Comparison:</h3>
+            <div style="display: flex; justify-content: space-between;">
+              <div style="flex: 1; margin-right: 10px;">
+                <h4 style="color: #e74c3c;">Your Offer:</h4>
+                <p><strong>Rate:</strong> ${yourOffer.interestRate}%</p>
+                <p><strong>Amount:</strong> ₦${yourOffer.amount?.toLocaleString()}</p>
+              </div>
+              <div style="flex: 1; margin-left: 10px;">
+                <h4 style="color: #27ae60;">Better Offer:</h4>
+                <p><strong>Rate:</strong> ${betterOffer.interestRate}%</p>
+                <p><strong>Amount:</strong> ₦${betterOffer.amount?.toLocaleString()}</p>
+              </div>
+            </div>
+          </div>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${marketplaceLink}" style="background-color: #f39c12; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">Update Your Offer</a>
+          </div>
+          
+          <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; border-left: 4px solid #ffc107; margin-top: 30px;">
+            <h4>🏁 Act Fast:</h4>
+            <p style="margin: 5px 0;">The seller might accept the better offer soon. Consider improving your interest rate or funding amount to stay in the race!</p>
+          </div>
+          
+          <p style="margin-top: 30px;">Best regards,<br>The Vestio Investment Team</p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const textContent = `
+      You've Been Outbid!
+      
+      Hello ${lender.firstName},
+      
+      Another lender has submitted a better offer for invoice ${invoice._id}.
+      
+      Offer Comparison:
+      Your Offer: ${yourOffer.interestRate}% - ₦${yourOffer.amount?.toLocaleString()}
+      Better Offer: ${betterOffer.interestRate}% - ₦${betterOffer.amount?.toLocaleString()}
+      
+      Update your offer: ${marketplaceLink}
+      
+      Best regards,
+      The Vestio Investment Team
+    `;
+
+    return {
+      subject: `Competitive Alert - Invoice ${invoice._id}`,
+      htmlContent,
+      textContent
+    };
+  }
+
+  private static getMultipleOffersAlertTemplate(seller: IUser, invoice: any, offerCount: number): EmailTemplate {
+    const invoiceOffersLink = `${this.frontendUrl}/seller/invoices/${invoice._id}/offers`;
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Multiple Offers Received - Vestio</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h1 style="color: #27ae60;">🎉 ${offerCount} Offers Received!</h1>
+          
+          <p>Hello ${seller.firstName},</p>
+          
+          <p>Fantastic news! Your invoice ${invoice._id} has received <strong>${offerCount} funding offers</strong> from interested lenders.</p>
+          
+          <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
+            <h3>Your Invoice:</h3>
+            <p><strong>Invoice:</strong> ${invoice._id}</p>
+            <p><strong>Amount:</strong> ₦${invoice.amount?.toLocaleString()}</p>
+            <p><strong>Total Offers:</strong> ${offerCount}</p>
+            <p><strong>Due Date:</strong> ${new Date(invoice.dueDate).toLocaleDateString()}</p>
+          </div>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${invoiceOffersLink}" style="background-color: #27ae60; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">Compare All Offers</a>
+          </div>
+          
+          <div style="background-color: #d4edda; padding: 15px; border-radius: 5px; border-left: 4px solid #27ae60; margin-top: 30px;">
+            <h4>💡 Smart Decision Making:</h4>
+            <ul style="margin: 5px 0;">
+              <li>Compare interest rates and terms carefully</li>
+              <li>Consider the lender's reputation and history</li>
+              <li>Choose the offer that best meets your needs</li>
+              <li>You can negotiate or wait for even better offers!</li>
+            </ul>
+          </div>
+          
+          <p style="margin-top: 30px;">Best regards,<br>The Vestio Marketplace Team</p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const textContent = `
+      ${offerCount} Offers Received!
+      
+      Hello ${seller.firstName},
+      
+      Your invoice ${invoice._id} has received ${offerCount} funding offers from interested lenders.
+      
+      Your Invoice:
+      - Invoice: ${invoice._id}
+      - Amount: ₦${invoice.amount?.toLocaleString()}
+      - Total Offers: ${offerCount}
+      - Due Date: ${new Date(invoice.dueDate).toLocaleDateString()}
+      
+      Compare all offers: ${invoiceOffersLink}
+      
+      Best regards,
+      The Vestio Marketplace Team
+    `;
+
+    return {
+      subject: `${offerCount} Offers Received - Invoice ${invoice._id}`,
+      htmlContent,
+      textContent
+    };
+  }
+
+  private static getInvoiceFundedTemplate(user: IUser, invoice: any, offer: any, lender: IUser): EmailTemplate {
+    const dashboardLink = `${this.frontendUrl}/dashboard`;
+    const transactionLink = `${this.frontendUrl}/transactions`;
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Invoice Funded Successfully - Vestio</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h1 style="color: #27ae60;">🎉 Invoice Successfully Funded!</h1>
+          
+          <p>Hello ${user.firstName},</p>
+          
+          <p>Excellent news! Your invoice has been successfully funded by <strong>${lender.firstName} ${lender.lastName}</strong>.</p>
+          
+          <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
+            <h3>Funding Details:</h3>
+            <p><strong>Invoice:</strong> ${invoice._id}</p>
+            <p><strong>Funded Amount:</strong> ₦${offer.amount?.toLocaleString()}</p>
+            <p><strong>Interest Rate:</strong> ${offer.interestRate}% per annum</p>
+            <p><strong>Repayment Amount:</strong> ₦${offer.totalRepaymentAmount?.toLocaleString() || 'Calculating...'}</p>
+            <p><strong>Due Date:</strong> ${new Date(invoice.dueDate).toLocaleDateString()}</p>
+          </div>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${transactionLink}" style="background-color: #27ae60; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">View Transaction</a>
+          </div>
+          
+          <div style="background-color: #d1ecf1; padding: 15px; border-radius: 5px; border-left: 4px solid #bee5eb; margin-top: 30px;">
+            <h4>📋 What Happens Next:</h4>
+            <ul style="margin: 5px 0;">
+              <li>Funds will be transferred to your account within 24 hours</li>
+              <li>Repayment will be automatically processed on the due date</li>
+              <li>You'll receive confirmation once funds are disbursed</li>
+              <li>Track your transaction in your dashboard</li>
+            </ul>
+          </div>
+          
+          <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; border-left: 4px solid #ffc107; margin-top: 20px;">
+            <h4>⚠️ Important Reminder:</h4>
+            <p style="margin: 5px 0;">Ensure you collect payment from your customer on time to meet the repayment schedule. Late payments may incur additional fees.</p>
+          </div>
+          
+          <p style="margin-top: 30px;">Best regards,<br>The Vestio Team</p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const textContent = `
+      Invoice Successfully Funded!
+      
+      Hello ${user.firstName},
+      
+      Your invoice has been successfully funded by ${lender.firstName} ${lender.lastName}.
+      
+      Funding Details:
+      - Invoice: ${invoice._id}
+      - Funded Amount: ₦${offer.amount?.toLocaleString()}
+      - Interest Rate: ${offer.interestRate}% per annum
+      - Repayment Amount: ₦${offer.totalRepaymentAmount?.toLocaleString() || 'Calculating...'}
+      - Due Date: ${new Date(invoice.dueDate).toLocaleDateString()}
+      
+      View transaction: ${transactionLink}
+      
+      Best regards,
+      The Vestio Team
+    `;
+
+    return {
+      subject: `Invoice Funded Successfully - ${invoice._id}`,
       htmlContent,
       textContent
     };

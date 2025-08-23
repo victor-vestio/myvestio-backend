@@ -469,10 +469,11 @@ export const createInvoiceSchema = Joi.object({
     }),
   
   currency: Joi.string()
-    .valid('NGN', 'USD', 'EUR', 'GBP')
+    .valid('NGN')
     .default('NGN')
+    .optional()
     .messages({
-      'any.only': 'Currency must be one of NGN, USD, EUR, GBP'
+      'any.only': 'Currency must be NGN'
     }),
   
   issueDate: Joi.date()
@@ -576,39 +577,7 @@ export const anchorApprovalSchema = Joi.object({
     .messages({
       'string.min': 'Rejection reason must be at least 10 characters',
       'string.max': 'Notes cannot exceed 1000 characters'
-    }),
-  
-  fundingTerms: Joi.object({
-    maxFundingAmount: Joi.number()
-      .positive()
-      .precision(2)
-      .when('...action', {
-        is: 'approve',
-        then: Joi.required(),
-        otherwise: Joi.forbidden()
-      })
-      .messages({
-        'number.positive': 'Funding amount must be positive'
-      }),
-    
-    recommendedInterestRate: Joi.number()
-      .min(0)
-      .max(5)
-      .precision(2)
-      .when('...action', {
-        is: 'approve',
-        then: Joi.required(),
-        otherwise: Joi.forbidden()
-      })
-      .messages({
-        'number.min': 'Interest rate must be non-negative',
-        'number.max': 'Interest rate cannot exceed 5% (company policy)'
-      })
-  }).when('action', {
-    is: 'approve',
-    then: Joi.required(),
-    otherwise: Joi.forbidden()
-  })
+    })
 });
 
 export const adminVerificationSchema = Joi.object({
@@ -648,6 +617,38 @@ export const adminVerificationSchema = Joi.object({
     is: 'verify',
     then: Joi.required(),
     otherwise: Joi.forbidden()
+  }),
+
+  fundingTerms: Joi.object({
+    maxFundingAmount: Joi.number()
+      .positive()
+      .required()
+      .messages({
+        'number.positive': 'Maximum funding amount must be positive'
+      }),
+    
+    recommendedInterestRate: Joi.number()
+      .min(0)
+      .max(50)
+      .required()
+      .messages({
+        'number.min': 'Interest rate must be at least 0%',
+        'number.max': 'Interest rate cannot exceed 50%'
+      }),
+    
+    maxTenure: Joi.number()
+      .integer()
+      .min(1)
+      .max(365)
+      .messages({
+        'number.integer': 'Maximum tenure must be a whole number of days',
+        'number.min': 'Maximum tenure must be at least 1 day',
+        'number.max': 'Maximum tenure cannot exceed 365 days'
+      })
+  }).when('action', {
+    is: 'verify',
+    then: Joi.optional(),
+    otherwise: Joi.forbidden()
   })
 });
 
@@ -663,7 +664,7 @@ export const invoiceSearchSchema = Joi.object({
   
   minAmount: Joi.number().positive(),
   maxAmount: Joi.number().positive().greater(Joi.ref('minAmount')),
-  currency: Joi.string().valid('NGN', 'USD', 'EUR', 'GBP'),
+  currency: Joi.string().valid('NGN'),
   
   dateFrom: Joi.date(),
   dateTo: Joi.date().greater(Joi.ref('dateFrom')),
@@ -679,10 +680,9 @@ export const invoiceSearchSchema = Joi.object({
   limit: Joi.number().integer().min(1).max(100).default(20)
 });
 
-export const marketplaceFiltersSchema = Joi.object({
+export const invoiceMarketplaceFiltersSchema = Joi.object({
   minAmount: Joi.number().positive(),
   maxAmount: Joi.number().positive().greater(Joi.ref('minAmount')),
-  currency: Joi.string().valid('NGN', 'USD', 'EUR', 'GBP'),
   anchorId: Joi.string().pattern(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/),
   maxDaysUntilDue: Joi.number().integer().positive(),
   
@@ -711,4 +711,292 @@ export const bulkStatusUpdateSchema = Joi.object({
   notes: Joi.string()
     .max(500)
     .allow('')
+});
+
+// ============================================
+// MARKETPLACE VALIDATION SCHEMAS
+// ============================================
+
+export const createOfferSchema = Joi.object({
+  invoiceId: Joi.string()
+    .pattern(/^INV-[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/)
+    .required()
+    .messages({
+      'string.pattern.base': 'Invalid invoice ID format',
+      'any.required': 'Invoice ID is required'
+    }),
+  
+  amount: Joi.number()
+    .positive()
+    .optional()
+    .messages({
+      'number.positive': 'Amount must be positive'
+    }),
+  
+  interestRate: Joi.number()
+    .min(0)
+    .max(100)
+    .precision(2)
+    .required()
+    .messages({
+      'number.min': 'Interest rate must be non-negative',
+      'number.max': 'Interest rate cannot exceed 100%',
+      'any.required': 'Interest rate is required'
+    }),
+  
+  fundingPercentage: Joi.number()
+    .min(1)
+    .max(100)
+    .precision(2)
+    .required()
+    .messages({
+      'number.min': 'Funding percentage must be at least 1%',
+      'number.max': 'Funding percentage cannot exceed 100%',
+      'any.required': 'Funding percentage is required'
+    }),
+  
+  tenure: Joi.number()
+    .integer()
+    .min(1)
+    .max(365)
+    .required()
+    .messages({
+      'number.integer': 'Tenure must be a whole number of days',
+      'number.min': 'Tenure must be at least 1 day',
+      'number.max': 'Tenure cannot exceed 365 days',
+      'any.required': 'Tenure is required'
+    }),
+  
+  terms: Joi.string()
+    .max(2000)
+    .allow('')
+    .messages({
+      'string.max': 'Terms cannot exceed 2000 characters'
+    }),
+  
+  lenderNotes: Joi.string()
+    .max(1000)
+    .allow('')
+    .messages({
+      'string.max': 'Lender notes cannot exceed 1000 characters'
+    }),
+  
+  expiresAt: Joi.date()
+    .greater('now')
+    .messages({
+      'date.greater': 'Expiration date must be in the future'
+    })
+});
+
+export const updateOfferSchema = Joi.object({
+  interestRate: Joi.number()
+    .min(0)
+    .max(100)
+    .precision(2)
+    .messages({
+      'number.min': 'Interest rate must be non-negative',
+      'number.max': 'Interest rate cannot exceed 100%'
+    }),
+  
+  fundingPercentage: Joi.number()
+    .min(1)
+    .max(100)
+    .precision(2)
+    .messages({
+      'number.min': 'Funding percentage must be at least 1%',
+      'number.max': 'Funding percentage cannot exceed 100%'
+    }),
+  
+  tenure: Joi.number()
+    .integer()
+    .min(1)
+    .max(365)
+    .messages({
+      'number.integer': 'Tenure must be a whole number of days',
+      'number.min': 'Tenure must be at least 1 day',
+      'number.max': 'Tenure cannot exceed 365 days'
+    }),
+  
+  terms: Joi.string()
+    .max(2000)
+    .allow('')
+    .messages({
+      'string.max': 'Terms cannot exceed 2000 characters'
+    }),
+  
+  lenderNotes: Joi.string()
+    .max(1000)
+    .allow('')
+    .messages({
+      'string.max': 'Lender notes cannot exceed 1000 characters'
+    }),
+  
+  expiresAt: Joi.date()
+    .greater('now')
+    .messages({
+      'date.greater': 'Expiration date must be in the future'
+    })
+}).min(1).messages({
+  'object.min': 'At least one field must be provided for update'
+});
+
+export const acceptOfferSchema = Joi.object({
+  acceptanceNotes: Joi.string()
+    .max(500)
+    .allow('')
+    .messages({
+      'string.max': 'Acceptance notes cannot exceed 500 characters'
+    })
+});
+
+export const rejectOfferSchema = Joi.object({
+  rejectionReason: Joi.string()
+    .min(10)
+    .max(500)
+    .required()
+    .messages({
+      'string.min': 'Rejection reason must be at least 10 characters',
+      'string.max': 'Rejection reason cannot exceed 500 characters',
+      'any.required': 'Rejection reason is required'
+    })
+});
+
+export const withdrawOfferSchema = Joi.object({
+  withdrawalReason: Joi.string()
+    .max(500)
+    .allow('')
+    .messages({
+      'string.max': 'Withdrawal reason cannot exceed 500 characters'
+    })
+});
+
+export const createCounterOfferSchema = Joi.object({
+  originalOfferId: Joi.string()
+    .pattern(/^OFF-[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/)
+    .required()
+    .messages({
+      'string.pattern.base': 'Invalid offer ID format',
+      'any.required': 'Original offer ID is required'
+    }),
+  
+  interestRate: Joi.number()
+    .min(0)
+    .max(100)
+    .precision(2)
+    .required()
+    .messages({
+      'number.min': 'Interest rate must be non-negative',
+      'number.max': 'Interest rate cannot exceed 100%',
+      'any.required': 'Interest rate is required'
+    }),
+  
+  fundingPercentage: Joi.number()
+    .min(1)
+    .max(100)
+    .precision(2)
+    .required()
+    .messages({
+      'number.min': 'Funding percentage must be at least 1%',
+      'number.max': 'Funding percentage cannot exceed 100%',
+      'any.required': 'Funding percentage is required'
+    }),
+  
+  tenure: Joi.number()
+    .integer()
+    .min(1)
+    .max(365)
+    .required()
+    .messages({
+      'number.integer': 'Tenure must be a whole number of days',
+      'number.min': 'Tenure must be at least 1 day',
+      'number.max': 'Tenure cannot exceed 365 days',
+      'any.required': 'Tenure is required'
+    }),
+  
+  terms: Joi.string()
+    .max(2000)
+    .allow('')
+    .messages({
+      'string.max': 'Terms cannot exceed 2000 characters'
+    }),
+  
+  lenderNotes: Joi.string()
+    .max(1000)
+    .allow('')
+    .messages({
+      'string.max': 'Lender notes cannot exceed 1000 characters'
+    })
+});
+
+export const marketplaceFiltersSchema = Joi.object({
+  page: Joi.number().integer().min(1).default(1),
+  limit: Joi.number().integer().min(1).max(50).default(20),
+  
+  // Invoice filters
+  minAmount: Joi.number().positive(),
+  maxAmount: Joi.number().positive().greater(Joi.ref('minAmount')),
+  minDaysUntilDue: Joi.number().integer().positive(),
+  maxDaysUntilDue: Joi.number().integer().positive().greater(Joi.ref('minDaysUntilDue')),
+  anchorId: Joi.string().pattern(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/),
+  
+  // Offer filters
+  minInterestRate: Joi.number().min(0).max(100),
+  maxInterestRate: Joi.number().min(0).max(100).greater(Joi.ref('minInterestRate')),
+  minFundingPercentage: Joi.number().min(1).max(100),
+  maxFundingPercentage: Joi.number().min(1).max(100).greater(Joi.ref('minFundingPercentage')),
+  minTenure: Joi.number().integer().min(1).max(365),
+  maxTenure: Joi.number().integer().min(1).max(365).greater(Joi.ref('minTenure')),
+  
+  // Status filters
+  status: Joi.alternatives().try(
+    Joi.string().valid('pending', 'accepted', 'rejected', 'withdrawn', 'expired'),
+    Joi.array().items(Joi.string().valid('pending', 'accepted', 'rejected', 'withdrawn', 'expired'))
+  ),
+  excludeMyOffers: Joi.boolean().default(false),
+  
+  // Sorting
+  sortBy: Joi.string().valid('createdAt', 'interestRate', 'amount', 'expiresAt', 'effectiveAnnualRate').default('createdAt'),
+  sortOrder: Joi.string().valid('asc', 'desc').default('desc')
+});
+
+export const sellerOfferFiltersSchema = Joi.object({
+  page: Joi.number().integer().min(1).default(1),
+  limit: Joi.number().integer().min(1).max(100).default(20),
+  
+  invoiceId: Joi.string().pattern(/^INV-[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/),
+  status: Joi.alternatives().try(
+    Joi.string().valid('pending', 'accepted', 'rejected', 'withdrawn', 'expired'),
+    Joi.array().items(Joi.string().valid('pending', 'accepted', 'rejected', 'withdrawn', 'expired'))
+  ),
+  
+  minInterestRate: Joi.number().min(0).max(100),
+  maxInterestRate: Joi.number().min(0).max(100).greater(Joi.ref('minInterestRate')),
+  minAmount: Joi.number().positive(),
+  maxAmount: Joi.number().positive().greater(Joi.ref('minAmount')),
+  
+  sortBy: Joi.string().valid('createdAt', 'interestRate', 'amount', 'expiresAt').default('createdAt'),
+  sortOrder: Joi.string().valid('asc', 'desc').default('desc')
+});
+
+export const lenderPortfolioFiltersSchema = Joi.object({
+  page: Joi.number().integer().min(1).default(1),
+  limit: Joi.number().integer().min(1).max(100).default(20),
+  
+  status: Joi.alternatives().try(
+    Joi.string().valid('pending', 'accepted', 'rejected', 'withdrawn', 'expired'),
+    Joi.array().items(Joi.string().valid('pending', 'accepted', 'rejected', 'withdrawn', 'expired'))
+  ),
+  invoiceStatus: Joi.alternatives().try(
+    Joi.string().valid('listed', 'funded', 'repaid', 'settled'),
+    Joi.array().items(Joi.string().valid('listed', 'funded', 'repaid', 'settled'))
+  ),
+  
+  minAmount: Joi.number().positive(),
+  maxAmount: Joi.number().positive().greater(Joi.ref('minAmount')),
+  
+  dateFrom: Joi.date(),
+  dateTo: Joi.date().greater(Joi.ref('dateFrom')),
+  
+  sortBy: Joi.string().valid('createdAt', 'interestRate', 'amount', 'status', 'expiresAt').default('createdAt'),
+  sortOrder: Joi.string().valid('asc', 'desc').default('desc')
 });

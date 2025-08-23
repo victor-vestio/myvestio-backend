@@ -11,6 +11,7 @@ import { configureResend } from './config/resend';
 import authRoutes from './routes/auth';
 import { kycRouter } from './routes/kyc';
 import invoiceRoutes from './routes/invoices';
+import marketplaceRoutes from './routes/marketplace';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -34,6 +35,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use('/api/auth', authRoutes);
 app.use('/api/kyc', kycRouter);
 app.use('/api/invoices', invoiceRoutes);
+app.use('/api/marketplace', marketplaceRoutes);
 
 app.get('/', (req, res) => {
   res.json({ 
@@ -90,6 +92,8 @@ const startServer = async (): Promise<void> => {
       console.log(`📊 Health check available at http://localhost:${port}/health`);
       console.log(`🔐 Auth endpoints available at http://localhost:${port}/api/auth`);
       console.log(`📄 KYC endpoints available at http://localhost:${port}/api/kyc`);
+      console.log(`📄 Invoice endpoints available at http://localhost:${port}/api/invoices`);
+      console.log(`🏪 Marketplace endpoints available at http://localhost:${port}/api/marketplace`);
       console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
     });
   } catch (error) {

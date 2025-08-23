@@ -66,6 +66,13 @@ export interface IInvoice extends Document {
   adminRejectionReason?: string;
   verifiedBy?: string;
   
+  // Admin-controlled marketplace funding terms
+  marketplaceFundingTerms?: {
+    maxFundingAmount?: number;
+    recommendedInterestRate?: number;
+    maxTenure?: number;
+  };
+  
   // Financial data
   fundingAmount?: number;
   interestRate?: number;
@@ -123,10 +130,6 @@ export interface SubmitInvoiceRequest {
 export interface AnchorApprovalRequest {
   action: 'approve' | 'reject';
   notes?: string;
-  fundingTerms?: {
-    maxFundingAmount: number;
-    recommendedInterestRate: number;
-  };
 }
 
 export interface AdminVerificationRequest {
@@ -136,6 +139,11 @@ export interface AdminVerificationRequest {
     documentsVerified: boolean;
     complianceChecked: boolean;
     riskAssessment?: string;
+  };
+  fundingTerms?: {
+    maxFundingAmount: number;
+    recommendedInterestRate: number;
+    maxTenure?: number;
   };
 }
 
@@ -196,9 +204,9 @@ export interface InvoiceDetailedResponse extends InvoiceBasicResponse {
   fundingAmount?: number;
   interestRate?: number;
   totalRepaymentAmount?: number;
-  repaidAmount: number;
-  fundingPercentage: number;
-  repaymentProgress: number;
+  repaidAmount?: number;
+  fundingPercentage?: number;
+  repaymentProgress?: number;
   
   // Related user data
   seller?: {
@@ -404,15 +412,19 @@ export interface ProcessedInvoiceFile {
 // Real-time update interfaces
 
 export interface InvoiceStatusUpdate {
-  type: 'status_change' | 'document_uploaded' | 'offer_received' | 'funded' | 'repaid';
+  type: 'status_change' | 'status_update' | 'document_uploaded' | 'offer_received' | 'funded' | 'repaid';
   invoiceId: string;
+  oldStatus?: InvoiceStatus;
   newStatus?: InvoiceStatus;
-  message: string;
+  message?: string;
   timestamp: Date;
   metadata?: {
     offerId?: string;
     funderId?: string;
+    fundedBy?: string;
     amount?: number;
+    fundingAmount?: number;
+    interestRate?: number;
     notes?: string;
     anchorId?: string;
     adminId?: string;
