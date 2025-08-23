@@ -39,7 +39,7 @@ const InvoiceSchema = new Schema<IInvoice>({
     type: String,
     required: true,
     default: 'NGN',
-    enum: ['NGN', 'USD', 'EUR', 'GBP'],
+    enum: ['NGN'],
     uppercase: true
   },
   
@@ -148,6 +148,42 @@ const InvoiceSchema = new Schema<IInvoice>({
     ref: 'User'
   },
   
+  // Admin-controlled marketplace funding terms
+  marketplaceFundingTerms: {
+    maxFundingAmount: {
+      type: Number,
+      min: [0, 'Maximum funding amount must be positive'],
+      validate: {
+        validator: function(this: IInvoice, value: number) {
+          if (value && this.amount) {
+            return value <= this.amount;
+          }
+          return true;
+        },
+        message: 'Maximum funding amount cannot exceed invoice amount'
+      }
+    },
+    recommendedInterestRate: {
+      type: Number,
+      min: [0, 'Recommended interest rate must be positive'],
+      max: [50, 'Recommended interest rate cannot exceed 50%']
+    },
+    maxTenure: {
+      type: Number,
+      min: [1, 'Maximum tenure must be at least 1 day'],
+      max: [365, 'Maximum tenure cannot exceed 365 days'],
+      validate: {
+        validator: function(this: IInvoice, value: number) {
+          if (value && this.daysUntilDue) {
+            return value <= this.daysUntilDue;
+          }
+          return true;
+        },
+        message: 'Maximum tenure cannot exceed days until due date'
+      }
+    }
+  },
+  
   // Financial data
   fundingAmount: {
     type: Number,
@@ -166,7 +202,7 @@ const InvoiceSchema = new Schema<IInvoice>({
   interestRate: {
     type: Number,
     min: [0, 'Interest rate must be positive'],
-    max: [5, 'Interest rate cannot exceed 5% (company policy)']
+    max: [50, 'Interest rate cannot exceed 50%']
   },
   
   fundedBy: {

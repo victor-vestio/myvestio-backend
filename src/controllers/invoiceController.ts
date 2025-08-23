@@ -18,6 +18,7 @@ import {
 import { InvoiceStatus, UserRole } from '../interfaces/common';
 import { InvoiceDocumentService } from '../services/invoiceDocumentService';
 import { InvoiceRedisService } from '../services/invoiceRedisService';
+import { MarketplaceRedisService } from '../services/marketplaceRedisService';
 import { EmailService } from '../services/emailService';
 
 export class InvoiceController {
@@ -550,6 +551,88 @@ export class InvoiceController {
   /**
    * Approve or reject invoice (Anchor only)
    */
+  /**
+   * Get invoice document for anchor review (main document only)
+   */
+  static async getAnchorInvoiceDocument(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const userId = req.user?.id;
+      const userRole = req.user?.role;
+
+      const invoice = await Invoice.findById(id).populate('sellerId', 'firstName lastName businessName');
+      if (!invoice) {
+        res.status(404).json({ 
+          success: false, 
+          message: 'Invoice not found' 
+        });
+        return;
+      }
+
+      // Check permissions - anchor can only view invoices assigned to them
+      if (userRole !== UserRole.ANCHOR || String(invoice.anchorId) !== userId) {
+        res.status(403).json({ 
+          success: false, 
+          message: 'Not authorized to view this invoice document' 
+        });
+        return;
+      }
+
+      // Only show invoices that are submitted for anchor review
+      if (invoice.status !== InvoiceStatus.SUBMITTED) {
+        res.status(400).json({ 
+          success: false, 
+          message: 'Invoice is not available for anchor review' 
+        });
+        return;
+      }
+
+      // Return basic invoice info with main document only (no supporting docs)
+      const response = {
+        invoiceId: String(invoice._id),
+        amount: invoice.amount,
+        currency: invoice.currency,
+        issueDate: invoice.issueDate,
+        dueDate: invoice.dueDate,
+        description: invoice.description,
+        status: invoice.status,
+        daysUntilDue: invoice.daysUntilDue,
+        isOverdue: invoice.isOverdue,
+        invoiceDocument: invoice.invoiceDocument ? {
+          filename: invoice.invoiceDocument.filename,
+          originalName: invoice.invoiceDocument.originalName,
+          cloudinaryUrl: invoice.invoiceDocument.cloudinaryUrl,
+          fileSize: invoice.invoiceDocument.fileSize,
+          mimeType: invoice.invoiceDocument.mimeType,
+          uploadedAt: invoice.invoiceDocument.uploadedAt
+        } : null,
+        seller: invoice.sellerId && typeof invoice.sellerId === 'object' ? {
+          businessName: (invoice.sellerId as any).businessName || 'N/A',
+          firstName: (invoice.sellerId as any).firstName || 'Unknown',
+          lastName: (invoice.sellerId as any).lastName || 'Unknown'
+        } : {
+          businessName: 'N/A',
+          firstName: 'Unknown',
+          lastName: 'Unknown'
+        }
+      };
+
+      res.json({
+        success: true,
+        message: 'Invoice document retrieved successfully',
+        data: response
+      });
+
+    } catch (error) {
+      console.error('Get anchor invoice document error:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: 'Failed to get invoice document',
+        error: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.message : String(error)) : undefined
+      });
+    }
+  }
+
   static async anchorApproval(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const { id } = req.params;
@@ -583,7 +666,7 @@ export class InvoiceController {
         return;
       }
 
-      const { action, notes, fundingTerms }: AnchorApprovalRequest = req.body;
+      const { action, notes }: AnchorApprovalRequest = req.body;
 
       const previousStatus = invoice.status;
 
@@ -592,12 +675,6 @@ export class InvoiceController {
         invoice.anchorApprovalDate = new Date();
         invoice.anchorApprovalNotes = notes;
         invoice.anchorRejectionReason = undefined;
-
-        // Store funding terms if provided
-        if (fundingTerms) {
-          invoice.fundingAmount = fundingTerms.maxFundingAmount;
-          invoice.interestRate = fundingTerms.recommendedInterestRate;
-        }
 
         // Update document permissions
         if (invoice.invoiceDocument?.cloudinaryPublicId) {
@@ -656,11 +733,14 @@ export class InvoiceController {
       });
 
       const response = await InvoiceController.formatInvoiceDetailedResponse(invoice);
+      
+      // Remove supporting documents from anchor approval response
+      const { supportingDocuments, ...anchorResponse } = response;
 
       res.json({
         success: true,
         message: `Invoice ${action}d successfully`,
-        data: response
+        data: anchorResponse
       });
 
     } catch (error) {
@@ -1042,7 +1122,7 @@ export class InvoiceController {
         return;
       }
 
-      const { action, notes, verificationDetails }: AdminVerificationRequest = req.body;
+      const { action, notes, verificationDetails, fundingTerms }: AdminVerificationRequest = req.body;
 
       const previousStatus = invoice.status;
 
@@ -1053,12 +1133,53 @@ export class InvoiceController {
         invoice.verifiedBy = userId as any;
         invoice.adminRejectionReason = undefined;
 
+        // Set marketplace funding terms (admin-controlled)
+        if (fundingTerms) {
+          invoice.marketplaceFundingTerms = {
+            maxFundingAmount: fundingTerms.maxFundingAmount,
+            recommendedInterestRate: fundingTerms.recommendedInterestRate,
+            maxTenure: fundingTerms.maxTenure
+          };
+        } else {
+          // Set default terms if not provided
+          const maxTenure = invoice.daysUntilDue > 14 ? invoice.daysUntilDue - 14 : 1;
+          invoice.marketplaceFundingTerms = {
+            maxFundingAmount: Math.floor(invoice.amount * 0.9), // Default 90%
+            recommendedInterestRate: 15, // Default 15%
+            maxTenure: maxTenure
+          };
+        }
+
         // Update document permissions
         if (invoice.invoiceDocument?.cloudinaryPublicId) {
           await InvoiceDocumentService.updateDocumentPermissions(
             invoice.invoiceDocument.cloudinaryPublicId,
             'verified'
           );
+        }
+
+        // Auto-list invoice in marketplace when verified
+        try {
+          // Update status to LISTED for marketplace
+          invoice.status = InvoiceStatus.LISTED;
+          invoice.listedAt = new Date();
+          invoice.addStatusHistory(InvoiceStatus.LISTED, userId, 'Auto-listed after admin verification');
+
+          // Publish new marketplace listing
+          await MarketplaceRedisService.publishNewListing(String(invoice._id), {
+            amount: invoice.amount,
+            currency: invoice.currency,
+            dueDate: invoice.dueDate,
+            description: invoice.description,
+            sellerId: invoice.sellerId,
+            anchorId: invoice.anchorId,
+            listedAt: invoice.listedAt
+          });
+
+          console.log(`📄 Invoice ${invoice._id} automatically listed in marketplace after verification`);
+        } catch (marketplaceError) {
+          console.error('Failed to auto-list invoice in marketplace:', marketplaceError);
+          // Don't fail the verification if marketplace listing fails
         }
 
       } else if (action === 'reject') {
@@ -1120,6 +1241,22 @@ export class InvoiceController {
 
     } catch (error) {
       console.error('Admin verification error:', error);
+      
+      // Handle validation errors with additional context
+      if (error instanceof Error && error.message.includes('Maximum tenure cannot exceed days until due date')) {
+        const invoice = await Invoice.findById(req.params.id);
+        res.status(400).json({ 
+          success: false, 
+          message: 'Failed to process admin verification',
+          error: error.message,
+          context: {
+            daysUntilDue: invoice?.daysUntilDue || 'Unknown',
+            maxAllowedTenure: invoice?.daysUntilDue || 'Unknown'
+          }
+        });
+        return;
+      }
+      
       res.status(500).json({ 
         success: false, 
         message: 'Failed to process admin verification',
@@ -1215,339 +1352,11 @@ export class InvoiceController {
     }
   }
 
-  /**
-   * List verified invoice to marketplace
-   */
-  static async listInvoiceToMarketplace(req: AuthenticatedRequest, res: Response): Promise<void> {
-    try {
-      const { id } = req.params;
-      const userId = req.user?.id;
-      const userRole = req.user?.role;
-
-      if (userRole !== UserRole.ADMIN) {
-        res.status(403).json({ 
-          success: false, 
-          message: 'Only admins can list invoices to marketplace' 
-        });
-        return;
-      }
-
-      const invoice = await Invoice.findById(id);
-      if (!invoice) {
-        res.status(404).json({ 
-          success: false, 
-          message: 'Invoice not found' 
-        });
-        return;
-      }
-
-      if (!invoice.canBeListed()) {
-        res.status(400).json({ 
-          success: false, 
-          message: 'Invoice cannot be listed in current status' 
-        });
-        return;
-      }
-
-      const previousStatus = invoice.status;
-      invoice.status = InvoiceStatus.LISTED;
-      invoice.listedAt = new Date();
-
-      // Update document permissions for marketplace access
-      if (invoice.invoiceDocument?.cloudinaryPublicId) {
-        await InvoiceDocumentService.updateDocumentPermissions(
-          invoice.invoiceDocument.cloudinaryPublicId,
-          'listed'
-        );
-      }
-
-      invoice.addStatusHistory(invoice.status, userId, 'Listed to marketplace');
-      await invoice.save();
-
-      // Track status change
-      await InvoiceRedisService.trackStatusChange(previousStatus, invoice.status, id);
-
-      // Invalidate caches
-      await InvoiceRedisService.invalidateInvoiceCaches(String(invoice._id), String(invoice.sellerId), String(invoice.anchorId));
-      await InvoiceRedisService.invalidateMarketplaceCaches();
-
-      // Publish marketplace update
-      await InvoiceRedisService.publishMarketplaceUpdate({
-        type: 'new_listing',
-        invoiceId: String(invoice._id),
-        invoice: await InvoiceController.formatInvoiceBasicResponse(invoice),
-        timestamp: new Date()
-      });
-
-      // Notify seller
-      const seller = await User.findById(invoice.sellerId);
-      if (seller) {
-        await EmailService.sendInvoiceStatusUpdate(
-          seller,
-          invoice,
-          invoice.status,
-          'Your invoice is now listed in the marketplace'
-        );
-
-        await InvoiceRedisService.publishSellerNotification(String(seller._id), {
-          type: 'invoice_listed',
-          invoiceId: String(invoice._id),
-          message: 'Invoice listed in marketplace',
-          adminId: userId,
-          timestamp: new Date()
-        });
-      }
-
-      const response = await InvoiceController.formatInvoiceDetailedResponse(invoice);
-
-      res.json({
-        success: true,
-        message: 'Invoice listed to marketplace successfully',
-        data: response
-      });
-
-    } catch (error) {
-      console.error('List invoice to marketplace error:', error);
-      res.status(500).json({ 
-        success: false, 
-        message: 'Failed to list invoice to marketplace',
-        error: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.message : String(error)) : undefined
-      });
-    }
-  }
 
   // ============================================
   // MARKETPLACE OPERATIONS
   // ============================================
 
-  /**
-   * Get marketplace invoices for lenders
-   */
-  static async getMarketplaceInvoices(req: AuthenticatedRequest, res: Response): Promise<void> {
-    try {
-      const userRole = req.user?.role;
-
-      if (userRole !== UserRole.LENDER) {
-        res.status(403).json({ 
-          success: false, 
-          message: 'Only lenders can view marketplace invoices' 
-        });
-        return;
-      }
-
-      const filters: MarketplaceFilters = {
-        page: Number(req.query.page) || 1,
-        limit: Number(req.query.limit) || 20,
-        sortBy: (req.query.sortBy as any) || 'listedAt',
-        sortOrder: (req.query.sortOrder as any) || 'desc',
-        ...req.query
-      };
-
-      // Try cache first
-      const cached = await InvoiceRedisService.getCachedMarketplaceInvoices(filters);
-      if (cached) {
-        res.json({
-          success: true,
-          data: {
-            invoices: cached,
-            pagination: InvoiceController.generatePaginationInfo(cached, filters as any)
-          }
-        });
-        return;
-      }
-
-      // Build query for marketplace invoices
-      const query: any = { status: InvoiceStatus.LISTED };
-      
-      if (filters.minAmount || filters.maxAmount) {
-        query.amount = {};
-        if (filters.minAmount) query.amount.$gte = filters.minAmount;
-        if (filters.maxAmount) query.amount.$lte = filters.maxAmount;
-      }
-      
-      if (filters.currency) query.currency = filters.currency;
-      if (filters.anchorId) query.anchorId = filters.anchorId;
-      
-      if (filters.maxDaysUntilDue) {
-        const cutoffDate = new Date();
-        cutoffDate.setDate(cutoffDate.getDate() + filters.maxDaysUntilDue);
-        query.dueDate = { $lte: cutoffDate };
-      }
-
-      const sortOptions: any = {};
-      sortOptions[filters.sortBy || 'listedAt'] = filters.sortOrder === 'asc' ? 1 : -1;
-
-      const skip = (filters.page! - 1) * filters.limit!;
-
-      const [invoices, total] = await Promise.all([
-        Invoice.find(query)
-          .sort(sortOptions)
-          .skip(skip)
-          .limit(filters.limit!)
-          .populate('sellerId', 'firstName lastName businessName')
-          .populate('anchorId', 'firstName lastName businessName _id'),
-        
-        Invoice.countDocuments(query)
-      ]);
-
-      const marketplaceInvoices: InvoiceMarketplaceResponse[] = invoices.map(invoice => ({
-        invoiceId: String(invoice._id),
-        amount: invoice.amount,
-        currency: invoice.currency,
-        issueDate: invoice.issueDate,
-        dueDate: invoice.dueDate,
-        description: invoice.description,
-        daysUntilDue: invoice.daysUntilDue,
-        isOverdue: invoice.isOverdue,
-        listedAt: invoice.listedAt!,
-        seller: {
-          businessName: (invoice.sellerId as any)?.businessName,
-          firstName: (invoice.sellerId as any)?.firstName,
-          lastName: (invoice.sellerId as any)?.lastName
-        },
-        anchor: {
-          businessName: (invoice.anchorId as any)?.businessName,
-          firstName: (invoice.anchorId as any)?.firstName,
-          lastName: (invoice.anchorId as any)?.lastName,
-          userId: (invoice.anchorId as any)?._id?.toString()
-        },
-        invoicePreview: invoice.invoiceDocument ? {
-          cloudinaryUrl: invoice.invoiceDocument.cloudinaryUrl,
-          thumbnailUrl: InvoiceDocumentService.generateThumbnailUrl(invoice.invoiceDocument.cloudinaryPublicId)
-        } : undefined,
-        timeOnMarket: Math.ceil((new Date().getTime() - invoice.listedAt!.getTime()) / (1000 * 60 * 60 * 24))
-      }));
-
-      // Cache results
-      await InvoiceRedisService.cacheMarketplaceInvoices(filters, marketplaceInvoices);
-
-      res.json({
-        success: true,
-        data: {
-          invoices: marketplaceInvoices,
-          pagination: {
-            currentPage: filters.page!,
-            totalPages: Math.ceil(total / filters.limit!),
-            totalItems: total,
-            itemsPerPage: filters.limit!,
-            hasNext: filters.page! * filters.limit! < total,
-            hasPrev: filters.page! > 1
-          },
-          filters
-        }
-      });
-
-    } catch (error) {
-      console.error('Get marketplace invoices error:', error);
-      res.status(500).json({ 
-        success: false, 
-        message: 'Failed to get marketplace invoices',
-        error: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.message : String(error)) : undefined
-      });
-    }
-  }
-
-  /**
-   * Get trending invoices
-   */
-  static async getTrendingInvoices(req: AuthenticatedRequest, res: Response): Promise<void> {
-    try {
-      const userRole = req.user?.role;
-
-      if (userRole !== UserRole.LENDER) {
-        res.status(403).json({ 
-          success: false, 
-          message: 'Only lenders can view trending invoices' 
-        });
-        return;
-      }
-
-      const limit = Number(req.query.limit) || 10;
-
-      // Try cache first
-      const cached = await InvoiceRedisService.getCachedPopularInvoices();
-      if (cached) {
-        res.json({
-          success: true,
-          data: {
-            trendingInvoices: cached.slice(0, limit)
-          }
-        });
-        return;
-      }
-
-      // Get trending invoice IDs from Redis
-      const trendingData = await InvoiceRedisService.getTrendingInvoices(limit);
-      
-      if (trendingData.length === 0) {
-        res.json({
-          success: true,
-          data: {
-            trendingInvoices: []
-          }
-        });
-        return;
-      }
-
-      // Get invoice details
-      const invoiceIds = trendingData.map(item => item.invoiceId);
-      const invoices = await Invoice.find({ 
-        _id: { $in: invoiceIds }, 
-        status: InvoiceStatus.LISTED 
-      })
-      .populate('sellerId', 'firstName lastName businessName')
-      .populate('anchorId', 'firstName lastName businessName _id');
-
-      const trendingInvoices: InvoiceMarketplaceResponse[] = invoices.map(invoice => {
-        const trendingInfo = trendingData.find(item => item.invoiceId === String(invoice._id));
-        return {
-          invoiceId: String(invoice._id),
-            amount: invoice.amount,
-          currency: invoice.currency,
-          issueDate: invoice.issueDate,
-          dueDate: invoice.dueDate,
-          description: invoice.description,
-          daysUntilDue: invoice.daysUntilDue,
-          isOverdue: invoice.isOverdue,
-          listedAt: invoice.listedAt!,
-          seller: {
-            businessName: (invoice.sellerId as any)?.businessName,
-            firstName: (invoice.sellerId as any)?.firstName,
-            lastName: (invoice.sellerId as any)?.lastName
-          },
-          anchor: {
-            businessName: (invoice.anchorId as any)?.businessName,
-            firstName: (invoice.anchorId as any)?.firstName,
-            lastName: (invoice.anchorId as any)?.lastName,
-            userId: (invoice.anchorId as any)?._id?.toString()
-          },
-          invoicePreview: invoice.invoiceDocument ? {
-            cloudinaryUrl: invoice.invoiceDocument.cloudinaryUrl,
-            thumbnailUrl: InvoiceDocumentService.generateThumbnailUrl(invoice.invoiceDocument.cloudinaryPublicId)
-          } : undefined,
-          timeOnMarket: Math.ceil((new Date().getTime() - invoice.listedAt!.getTime()) / (1000 * 60 * 60 * 24))
-        };
-      });
-
-      // Cache results
-      await InvoiceRedisService.cachePopularInvoices(trendingInvoices);
-
-      res.json({
-        success: true,
-        data: {
-          trendingInvoices
-        }
-      });
-
-    } catch (error) {
-      console.error('Get trending invoices error:', error);
-      res.status(500).json({ 
-        success: false, 
-        message: 'Failed to get trending invoices',
-        error: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.message : String(error)) : undefined
-      });
-    }
-  }
 
   // ============================================
   // PLACEHOLDER METHODS (TO BE IMPLEMENTED)
@@ -2035,29 +1844,6 @@ export class InvoiceController {
     }
   }
 
-  static async getPerformanceMetrics(req: AuthenticatedRequest, res: Response): Promise<void> {
-    res.status(501).json({ success: false, message: 'Not implemented yet' });
-  }
-
-  static async getMarketTrends(req: AuthenticatedRequest, res: Response): Promise<void> {
-    res.status(501).json({ success: false, message: 'Not implemented yet' });
-  }
-
-  static async searchInvoices(req: AuthenticatedRequest, res: Response): Promise<void> {
-    res.status(501).json({ success: false, message: 'Not implemented yet' });
-  }
-
-  static async getFilterOptions(req: AuthenticatedRequest, res: Response): Promise<void> {
-    res.status(501).json({ success: false, message: 'Not implemented yet' });
-  }
-
-  static async bulkStatusUpdate(req: AuthenticatedRequest, res: Response): Promise<void> {
-    res.status(501).json({ success: false, message: 'Not implemented yet' });
-  }
-
-  static async exportInvoices(req: AuthenticatedRequest, res: Response): Promise<void> {
-    res.status(501).json({ success: false, message: 'Not implemented yet' });
-  }
 
   static async uploadSupportingDocuments(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
@@ -2283,13 +2069,6 @@ export class InvoiceController {
     }
   }
 
-  static async subscribeToInvoiceUpdates(req: AuthenticatedRequest, res: Response): Promise<void> {
-    res.status(501).json({ success: false, message: 'Not implemented yet' });
-  }
-
-  static async sendCustomNotification(req: AuthenticatedRequest, res: Response): Promise<void> {
-    res.status(501).json({ success: false, message: 'Not implemented yet' });
-  }
 
   // ============================================
   // HELPER METHODS
@@ -2441,12 +2220,14 @@ export class InvoiceController {
       anchorRejectionReason: invoice.anchorRejectionReason,
       adminVerificationNotes: invoice.adminVerificationNotes,
       adminRejectionReason: invoice.adminRejectionReason,
-      fundingAmount: invoice.fundingAmount,
-      interestRate: invoice.interestRate,
-      totalRepaymentAmount: invoice.totalRepaymentAmount,
-      repaidAmount: invoice.repaidAmount,
-      fundingPercentage: invoice.fundingPercentage,
-      repaymentProgress: invoice.repaymentProgress,
+      ...(invoice.fundingAmount !== undefined && invoice.fundingAmount !== null && {
+        fundingAmount: invoice.fundingAmount,
+        interestRate: invoice.interestRate,
+        totalRepaymentAmount: invoice.totalRepaymentAmount,
+        repaidAmount: invoice.repaidAmount,
+        fundingPercentage: invoice.fundingPercentage,
+        repaymentProgress: invoice.repaymentProgress,
+      }),
       seller: invoice.sellerId && typeof invoice.sellerId === 'object' ? {
         userId: String(invoice.sellerId._id),
         firstName: invoice.sellerId.firstName,
