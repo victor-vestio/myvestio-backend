@@ -197,7 +197,7 @@ KYCSchema.methods.isComplete = function(this: IKYC): boolean {
   const allDocsUploaded = requiredDocs.every((docType: DocumentType) => uploadedDocTypes.includes(docType));
   
   // Check if bank details are required and provided
-  const bankDetailsRequired = [UserRole.SELLER, UserRole.ANCHOR].includes(userRole) ||
+  const bankDetailsRequired = userRole === UserRole.SELLER ||
     (userRole === UserRole.LENDER && this.userBusinessType === BusinessType.COMPANY);
   const bankDetailsProvided = !bankDetailsRequired || Boolean(
     this.bankDetails && 

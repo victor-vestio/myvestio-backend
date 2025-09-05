@@ -107,61 +107,6 @@ export class KYCController {
     }
   }
   
-  // Get uploaded documents (returns status with document URLs)
-  static async getDocuments(req: AuthenticatedRequest, res: Response<ApiResponse<KYCStatusResponse>>): Promise<void> {
-    try {
-      const userId = req.user!.userId;
-      const kycStatus = await KYCService.getKYCStatus(userId);
-      
-      res.status(200).json({
-        success: true,
-        message: 'Documents retrieved successfully',
-        data: kycStatus
-      });
-      
-    } catch (error: any) {
-      console.error('Get documents error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Failed to retrieve documents',
-        error: 'Internal server error'
-      });
-    }
-  }
-  
-  // Delete specific document
-  static async deleteDocument(req: AuthenticatedRequest, res: Response<ApiResponse<KYCStatusResponse>>): Promise<void> {
-    try {
-      const userId = req.user!.userId;
-      const { documentType } = req.params;
-      
-      if (!Object.values(DocumentType).includes(documentType as DocumentType)) {
-        res.status(400).json({
-          success: false,
-          message: 'Document deletion failed',
-          error: 'Invalid document type'
-        });
-        return;
-      }
-      
-      const kycStatus = await KYCService.deleteDocument(userId, documentType as DocumentType);
-      
-      res.status(200).json({
-        success: true,
-        message: 'Document deleted successfully',
-        data: kycStatus
-      });
-      
-    } catch (error: any) {
-      console.error('Delete document error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Document deletion failed',
-        error: error.message || 'Internal server error'
-      });
-    }
-  }
-  
   // Admin: Get pending KYC applications with pagination and filtering
   static async getPendingKYCApplications(req: AuthenticatedRequest, res: Response<ApiResponse>): Promise<void> {
     try {
@@ -314,7 +259,7 @@ export class KYCController {
         userRole: req.user!.role,
         userBusinessType: req.user!.businessType,
         requiredDocuments: kycStatus.requiredDocuments,
-        bankDetailsRequired: ['seller', 'anchor'].includes(req.user!.role) || 
+        bankDetailsRequired: req.user!.role === 'seller' || 
           (req.user!.role === 'lender' && req.user!.businessType === 'company'),
         dateOfBirthRequired: req.user!.role === 'lender' && req.user!.businessType === 'individual'
       };

@@ -79,6 +79,8 @@ export interface KYCStatusResponse {
   reviewedAt?: Date;
   approvalNotes?: string;
   rejectionReason?: string;
+  bankDetails?: BankDetails;
+  dateOfBirth?: Date;
 }
 
 export interface UploadDocumentResponse {

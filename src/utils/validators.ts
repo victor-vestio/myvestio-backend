@@ -346,6 +346,7 @@ export const submitKYCSchema = Joi.object({
     
     bvn: Joi.string()
       .trim()
+      .allow('', null)
       .length(11)
       .pattern(/^[0-9]+$/)
       .optional()
@@ -406,6 +407,7 @@ export const updateKYCSchema = Joi.object({
     
     bvn: Joi.string()
       .trim()
+      .allow('', null)
       .length(11)
       .pattern(/^[0-9]+$/)
       .optional()

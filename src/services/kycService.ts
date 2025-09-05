@@ -72,6 +72,16 @@ export class KYCService {
         kyc.dateOfBirth = new Date(additionalData.dateOfBirth);
       }
       
+      // Reset everything when user uploads after rejection - fresh start
+      if (kyc.status === KYCStatus.REJECTED) {
+        kyc.status = KYCStatus.INCOMPLETE; // Pre-save middleware will set to SUBMITTED if complete
+        kyc.rejectionReason = undefined;
+        kyc.reviewedAt = undefined;
+        kyc.reviewedBy = undefined;
+        kyc.submittedAt = undefined;
+        kyc.approvalNotes = undefined; // Clear any old approval notes too
+      }
+      
       // Save and let pre-save middleware update status
       const previousStatus = kyc.status;
       await kyc.save();
@@ -189,33 +199,6 @@ export class KYCService {
     
     if (updateData.dateOfBirth) {
       kyc.dateOfBirth = new Date(updateData.dateOfBirth);
-    }
-    
-    await kyc.save();
-    return this.formatKYCStatusResponse(kyc);
-  }
-  
-  // Delete specific document
-  static async deleteDocument(userId: string, documentType: DocumentType): Promise<KYCStatusResponse> {
-    const kyc = await this.getOrCreateKYC(userId);
-    
-    // Find document to delete
-    const docIndex = kyc.documents.findIndex(doc => doc.documentType === documentType);
-    if (docIndex === -1) {
-      throw new Error('Document not found');
-    }
-    
-    const documentToDelete = kyc.documents[docIndex];
-    
-    // Remove from Cloudinary
-    await deleteFromCloudinary(documentToDelete.cloudinaryPublicId);
-    
-    // Remove from database
-    kyc.documents.splice(docIndex, 1);
-    
-    // Update status if needed
-    if (kyc.status === KYCStatus.SUBMITTED && !kyc.isComplete()) {
-      kyc.status = KYCStatus.INCOMPLETE;
     }
     
     await kyc.save();
@@ -448,7 +431,9 @@ export class KYCService {
       submittedAt: kyc.submittedAt,
       reviewedAt: kyc.reviewedAt,
       approvalNotes: kyc.approvalNotes,
-      rejectionReason: kyc.rejectionReason
+      rejectionReason: kyc.rejectionReason,
+      bankDetails: kyc.bankDetails,
+      dateOfBirth: kyc.dateOfBirth
     };
   }
   
