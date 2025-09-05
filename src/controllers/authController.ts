@@ -15,7 +15,6 @@ import {
   VerifyEmailOTPRequest,
   VerifyEmailOTPResponse,
   VerifyTwoFARequest,
-  UpdateProfileRequest,
   ChangePasswordRequest,
   ForgotPasswordRequest,
   ResetPasswordRequest,
@@ -728,45 +727,6 @@ export class AuthController {
       res.status(500).json({
         success: false,
         message: "Failed to retrieve profile",
-        error: "Internal server error",
-      });
-    }
-  }
-
-  static async updateProfile(
-    req: AuthenticatedRequest,
-    res: Response<ApiResponse>
-  ): Promise<void> {
-    try {
-      const user = req.user!;
-      const updates: UpdateProfileRequest = req.body;
-
-      // Update allowed fields
-      Object.keys(updates).forEach((key) => {
-        if (updates[key as keyof UpdateProfileRequest] !== undefined) {
-          (user as any)[key] = updates[key as keyof UpdateProfileRequest];
-        }
-      });
-
-      await user.save();
-
-      res.status(200).json({
-        success: true,
-        message: "Profile updated successfully",
-        data: {
-          userId: user.userId,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          phone: user.phone,
-          businessName: user.businessName,
-        },
-      });
-    } catch (error: any) {
-      console.error("Update profile error:", error);
-      res.status(500).json({
-        success: false,
-        message: "Failed to update profile",
         error: "Internal server error",
       });
     }

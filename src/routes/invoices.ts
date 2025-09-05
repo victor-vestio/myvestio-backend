@@ -1,7 +1,7 @@
 import express from 'express';
 import { InvoiceController } from '../controllers/invoiceController';
 import { authenticate } from '../middleware/auth';
-import { requireRole } from '../middleware/roleAuth';
+import { requireRole, requireKYC } from '../middleware/roleAuth';
 import { uploadInvoiceDocuments } from '../middleware/upload';
 import { validateCreateInvoice, validateUpdateInvoice, validateSubmitInvoice, validateAnchorApproval, validateAdminVerification } from '../middleware/validation';
 import { UserRole } from '../interfaces/common';
@@ -49,6 +49,7 @@ router.use(authenticate);
 router.post(
   '/create',
   requireRole(UserRole.SELLER),
+  requireKYC,
   invoiceActionRateLimit,
   validateCreateInvoice,
   InvoiceController.createInvoice
@@ -62,6 +63,7 @@ router.post(
 router.put(
   '/:id',
   requireRole(UserRole.SELLER),
+  requireKYC,
   invoiceActionRateLimit,
   validateUpdateInvoice,
   InvoiceController.updateInvoice
@@ -75,6 +77,7 @@ router.put(
 router.post(
   '/:id/upload-document',
   requireRole(UserRole.SELLER),
+  requireKYC,
   invoiceUploadRateLimit,
   uploadInvoiceDocuments.single('invoiceDocument'),
   InvoiceController.uploadInvoiceDocument
@@ -88,6 +91,7 @@ router.post(
 router.post(
   '/:id/submit',
   requireRole(UserRole.SELLER),
+  requireKYC,
   invoiceActionRateLimit,
   validateSubmitInvoice,
   InvoiceController.submitInvoice
@@ -101,6 +105,7 @@ router.post(
 router.delete(
   '/:id',
   requireRole(UserRole.SELLER),
+  requireKYC,
   invoiceActionRateLimit,
   InvoiceController.deleteInvoice
 );
@@ -117,6 +122,7 @@ router.delete(
 router.get(
   '/anchor/pending',
   requireRole(UserRole.ANCHOR),
+  requireKYC,
   InvoiceController.getPendingApprovals
 );
 
@@ -128,6 +134,7 @@ router.get(
 router.get(
   '/:id/anchor-document',
   requireRole(UserRole.ANCHOR),
+  requireKYC,
   InvoiceController.getAnchorInvoiceDocument
 );
 
@@ -139,6 +146,7 @@ router.get(
 router.post(
   '/:id/anchor-approval',
   requireRole(UserRole.ANCHOR),
+  requireKYC,
   invoiceActionRateLimit,
   validateAnchorApproval,
   InvoiceController.anchorApproval
@@ -152,6 +160,7 @@ router.post(
 router.get(
   '/anchor/history',
   requireRole(UserRole.ANCHOR),
+  requireKYC,
   InvoiceController.getUserInvoices
 );
 
@@ -305,6 +314,7 @@ router.get(
 router.post(
   '/:id/supporting-documents',
   requireRole(UserRole.SELLER),
+  requireKYC,
   invoiceUploadRateLimit,
   uploadInvoiceDocuments.array('supportingDocuments', 5),
   InvoiceController.uploadSupportingDocuments
@@ -318,6 +328,7 @@ router.post(
 router.delete(
   '/:id/supporting-documents/:docId',
   requireRole(UserRole.SELLER),
+  requireKYC,
   invoiceActionRateLimit,
   InvoiceController.deleteSupportingDocument
 );

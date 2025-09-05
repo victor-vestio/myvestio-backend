@@ -6,7 +6,6 @@ import { validateRequest } from '../middleware/validation';
 import {
   registerSchema,
   loginSchema,
-  updateProfileSchema,
   changePasswordSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
@@ -137,12 +136,6 @@ router.post('/logout',
 router.get('/profile',
   generalLimiter,
   AuthController.getProfile
-);
-
-router.put('/profile',
-  generalLimiter,
-  validateRequest(updateProfileSchema),
-  AuthController.updateProfile
 );
 
 router.put('/change-password',

@@ -94,18 +94,6 @@ router.put('/update',
   KYCController.updateKYC
 );
 
-router.get('/documents', 
-  kycActionLimit,
-  authenticate, 
-  KYCController.getDocuments
-);
-
-router.delete('/documents/:documentType', 
-  kycActionLimit,
-  authenticate, 
-  KYCController.deleteDocument
-);
-
 // Admin KYC routes
 router.get('/admin/pending', 
   kycActionLimit,

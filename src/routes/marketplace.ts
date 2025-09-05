@@ -1,7 +1,7 @@
 import express from 'express';
 import { MarketplaceController } from '../controllers/marketplaceController';
 import { authenticate as auth } from '../middleware/auth';
-import { requireRole } from '../middleware/roleAuth';
+import { requireRole, requireKYC } from '../middleware/roleAuth';
 import { validateRequest } from '../middleware/validation';
 import { 
   createOfferSchema,
@@ -70,6 +70,7 @@ router.get(
   marketplaceBrowsingLimit,
   auth,
   requireRole(UserRole.LENDER),
+  requireKYC,
   validateRequest(marketplaceFiltersSchema),
   MarketplaceController.browseMarketplace
 );
@@ -85,6 +86,7 @@ router.get(
   marketplaceBrowsingLimit,
   auth,
   requireRole(UserRole.LENDER),
+  requireKYC,
   MarketplaceController.getMarketplaceInvoiceDetails
 );
 
@@ -103,6 +105,7 @@ router.post(
   offerCreationLimit,
   auth,
   requireRole(UserRole.LENDER),
+  requireKYC,
   validateRequest(createOfferSchema),
   MarketplaceController.createOffer
 );
@@ -118,6 +121,7 @@ router.get(
   marketplaceBrowsingLimit,
   auth,
   requireRole(UserRole.LENDER),
+  requireKYC,
   validateRequest(lenderPortfolioFiltersSchema),
   MarketplaceController.getLenderOffers
 );
@@ -134,6 +138,7 @@ router.put(
   offerActionLimit,
   auth,
   requireRole(UserRole.LENDER),
+  requireKYC,
   validateRequest(withdrawOfferSchema),
   MarketplaceController.withdrawOffer
 );
@@ -154,6 +159,7 @@ router.get(
   marketplaceBrowsingLimit,
   auth,
   requireRole(UserRole.SELLER),
+  requireKYC,
   validateRequest(sellerOfferFiltersSchema),
   MarketplaceController.getInvoiceOffers
 );
@@ -170,6 +176,7 @@ router.put(
   offerActionLimit,
   auth,
   requireRole(UserRole.SELLER),
+  requireKYC,
   validateRequest(acceptOfferSchema),
   MarketplaceController.acceptOffer
 );
@@ -186,6 +193,7 @@ router.put(
   offerActionLimit,
   auth,
   requireRole(UserRole.SELLER),
+  requireKYC,
   validateRequest(rejectOfferSchema),
   MarketplaceController.rejectOffer
 );
